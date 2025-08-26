@@ -54,8 +54,8 @@ def login_view(request):
                 login(request, user)
                 messages.success(request, f'Welcome back, {user.first_name}!')
                 
-                # Redirect to recovery or requested page
-                next_url = request.GET.get('next', 'start_recovery')
+                # Redirect to dashboard or requested page
+                next_url = request.GET.get('next', 'dashboard')  # Changed from 'start_recovery' to 'dashboard'
                 return redirect(next_url)
             else:
                 messages.error(request, 'Invalid email or password.')
@@ -140,8 +140,8 @@ def register_view(request):
             user = authenticate(request, username=username, password=password)
             login(request, user)
             
-            messages.success(request, f'Welcome to BTRFS Recovery, {first_name}! Your account has been created.')
-            return redirect('start_recovery')
+            messages.success(request, f'Welcome to BTRFS Recovery, {first_name}!')
+            return redirect('dashboard')  # Changed from 'start_recovery' to 'dashboard'
             
         except Exception as e:
             messages.error(request, 'Registration failed. Please try again.')
@@ -159,6 +159,11 @@ def logout_view(request):
 @login_required
 def start_recovery(request):
     """Initialize recovery process - entry point from 'Start recovery now' button"""
+    # Clear any existing messages to ensure clean state
+    if request.method == 'GET':
+        storage = messages.get_messages(request)
+        storage.used = True  # Mark all messages as used to clear them
+    
     try:
         # Get or create user profile
         profile, created = UserProfile.objects.get_or_create(user=request.user)
@@ -178,7 +183,8 @@ def start_recovery(request):
         return render(request, 'recovery/start_recovery.html', context)
         
     except Exception as e:
-        messages.error(request, f'Failed to initialize recovery: {str(e)}')
+        logger.error(f"Error in start_recovery view: {str(e)}")
+        messages.error(request, 'There was an issue initializing the recovery system. Please try again.')
         return redirect('dashboard')
 
 @login_required
