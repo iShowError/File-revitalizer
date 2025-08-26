@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
 from django.contrib import messages
 from django.http import JsonResponse, FileResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
@@ -75,8 +76,8 @@ def register_view(request):
         first_name = request.POST.get('first_name', '').strip()
         last_name = request.POST.get('last_name', '').strip()
         email = request.POST.get('email', '').strip()
-        password = request.POST.get('password', '')
-        confirm_password = request.POST.get('confirm_password', '')
+        password = request.POST.get('password1', '')  # Fixed: Changed from 'password' to 'password1'
+        confirm_password = request.POST.get('password2', '')  # Fixed: Changed from 'confirm_password' to 'password2'
         
         # Validation
         errors = []
@@ -99,6 +100,12 @@ def register_view(request):
             errors.append('Password is required.')
         elif len(password) < 8:
             errors.append('Password must be at least 8 characters long.')
+        else:
+            # Use Django's built-in password validation
+            try:
+                validate_password(password)
+            except ValidationError as e:
+                errors.extend(e.messages)
         
         if password != confirm_password:
             errors.append('Passwords do not match.')
