@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Recovery Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Custom Font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Glassmorphism Sidebar */
+        .sidebar {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        /* Animation for elements scrolling into view */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* 3D Tilt Effect for Stat Cards */
+        .stat-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        /* Shine effect on hover for cards */
+        .shine-effect {
+            position: relative;
+            overflow: hidden;
+        }
+        .shine-effect::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -150%;
+            width: 75%;
+            height: 100%;
+            background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0) 100%);
+            transform: skewX(-25deg);
+            transition: left 0.7s ease;
+        }
+        .shine-effect:hover::before {
+            left: 150%;
+        }
+        
+        /* Gradient text for titles */
+        .gradient-text {
+            background: linear-gradient(to right, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="sidebar w-64 flex-shrink-0">
+            <div class="p-4 border-b">
+                <h1 class="text-xl font-bold flex items-center gradient-text">
+                    <i class="fas fa-shield-alt mr-2"></i>
+                    FileRevitalizer
+                </h1>
+            </div>
+            <nav class="p-4">
+                <ul class="space-y-2">
+                    <li><a href="{% url 'home' %}" class="flex items-center p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"><i class="fas fa-home w-6 text-center mr-3"></i>Home</a></li>
+                    <li><a href="{% url 'dashboard' %}" class="flex items-center p-2 bg-blue-100 text-blue-700 font-semibold rounded-lg"><i class="fas fa-chart-pie w-6 text-center mr-3"></i>Dashboard</a></li>
+                    <li><a href="#" class="flex items-center p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"><i class="fas fa-history w-6 text-center mr-3"></i>History</a></li>
+                    <li><a href="#" class="flex items-center p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"><i class="fas fa-cog w-6 text-center mr-3"></i>Settings</a></li>
+                </ul>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 overflow-auto">
+            <!-- Header -->
+            <header class="bg-white/80 backdrop-blur-sm sticky top-0 z-10 shadow-sm p-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-bold text-slate-800">Dashboard</h2>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative group">
+                            <input type="text" placeholder="Search..." class="pl-10 pr-4 py-2 border rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 w-48 focus:w-64 bg-slate-50">
+                            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <img src="https://placehold.co/40x40/E2E8F0/475569?text=A" class="w-10 h-10 rounded-full border-2 border-transparent hover:border-blue-500 transition-all" alt="Admin Avatar">
+                            <span class="font-semibold text-slate-700">Admin</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Content -->
+            <main class="p-6">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-500">Total Recoveries</p>
+                                <h3 class="text-3xl font-bold text-slate-800 number-scramble" data-value="124">0</h3>
+                            </div>
+                            <div class="p-3 rounded-full bg-blue-100 text-blue-600"><i class="fas fa-hdd text-xl"></i></div>
+                        </div>
+                    </div>
+                    <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal" style="transition-delay: 100ms;">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-500">Success Rate</p>
+                                <h3 class="text-3xl font-bold text-slate-800">
+                                    <span class="number-scramble" data-value="98">0</span>%
+                                </h3>
+                            </div>
+                            <div class="p-3 rounded-full bg-green-100 text-green-600"><i class="fas fa-check-circle text-xl"></i></div>
+                        </div>
+                    </div>
+                    <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal" style="transition-delay: 200ms;">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-500">Data Recovered</p>
+                                <h3 class="text-3xl font-bold text-slate-800">
+                                    <span class="number-scramble" data-value="2.4">0</span> TB
+                                </h3>
+                            </div>
+                            <div class="p-3 rounded-full bg-purple-100 text-purple-600"><i class="fas fa-database text-xl"></i></div>
+                        </div>
+                    </div>
+                    <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal" style="transition-delay: 300ms;">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-500">Active Jobs</p>
+                                <h3 class="text-3xl font-bold text-slate-800 number-scramble" data-value="453">0</h3>
+                            </div>
+                            <div class="p-3 rounded-full bg-yellow-100 text-yellow-600"><i class="fas fa-spinner text-xl animate-spin"></i></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart -->
+                <div class="bg-white p-6 rounded-2xl shadow-md mb-8 reveal">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">Recovery Success Rate Over Time</h3>
+                    <div class="relative h-96"><canvas id="recoveryChart"></canvas></div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="bg-white rounded-2xl shadow-md reveal">
+                    <div class="p-6 border-b"><h3 class="text-lg font-bold text-slate-800">Recent Recovery Jobs</h3></div>
+                    <div class="divide-y divide-slate-100">
+                        <!-- Activity Items will be dynamically added here by JS -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // --- NUMBER SCRAMBLE EFFECT ---
+        class NumberScramble {
+            constructor(el) {
+                this.el = el;
+                this.chars = '0123456789';
+                this.update = this.update.bind(this);
+            }
+            setText(newText) {
+                const oldText = this.el.innerText;
+                const length = Math.max(oldText.length, newText.length);
+                const promise = new Promise((resolve) => this.resolve = resolve);
+                this.queue = [];
+                for (let i = 0; i < length; i++) {
+                    const from = oldText[i] || '';
+                    const to = newText[i] || '';
+                    const start = Math.floor(Math.random() * 60);
+                    const end = start + Math.floor(Math.random() * 60);
+                    this.queue.push({ from, to, start, end });
+                }
+                cancelAnimationFrame(this.frameRequest);
+                this.frame = 0;
+                this.update();
+                return promise;
+            }
+            update() {
+                let output = '';
+                let complete = 0;
+                for (let i = 0, n = this.queue.length; i < n; i++) {
+                    let { from, to, start, end, char } = this.queue[i];
+                    if (this.frame >= end) {
+                        complete++;
+                        output += to;
+                    } else if (this.frame >= start) {
+                        if (!char || Math.random() < 0.28) {
+                            char = this.chars[Math.floor(Math.random() * this.chars.length)];
+                            this.queue[i].char = char;
+                        }
+                        output += `<span class="opacity-50">${char}</span>`;
+                    } else {
+                        output += from;
+                    }
+                }
+                this.el.innerHTML = output;
+                if (complete === this.queue.length) {
+                    this.resolve();
+                } else {
+                    this.frameRequest = requestAnimationFrame(this.update);
+                    this.frame++;
+                }
+            }
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- INTERSECTION OBSERVER FOR SCROLL ANIMATIONS ---
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        if (entry.target.classList.contains('stat-card')) {
+                            const numberEl = entry.target.querySelector('.number-scramble');
+                            if (numberEl && !numberEl.dataset.animated) {
+                                const fx = new NumberScramble(numberEl);
+                                fx.setText(numberEl.dataset.value);
+                                numberEl.dataset.animated = "true";
+                            }
+                        }
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+            // --- 3D TILT EFFECT & HOVER-TRIGGERED SCRAMBLE FOR STAT CARDS ---
+            document.querySelectorAll('.stat-card').forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left - rect.width / 2;
+                    const y = e.clientY - rect.top - rect.height / 2;
+                    const rotateX = -y / 20;
+                    const rotateY = x / 20;
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.05)`;
+                    card.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.25)';
+                });
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)';
+                    card.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                });
+                const numberEl = card.querySelector('.number-scramble');
+                if (numberEl) {
+                    const fx = new NumberScramble(numberEl);
+                    let isAnimating = false;
+                    card.addEventListener('mouseenter', () => {
+                        if (isAnimating) return;
+                        isAnimating = true;
+                        fx.setText(numberEl.dataset.value).then(() => {
+                            isAnimating = false;
+                        });
+                    });
+                }
+            });
+            // --- ADVANCED CHART.JS IMPLEMENTATION ---
+            const chartCtx = document.getElementById('recoveryChart').getContext('2d');
+            const gradient = chartCtx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
+            gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+            const recoveryChart = new Chart(chartCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Success Rate',
+                        data: [92, 94, 96, 95, 97, 98],
+                        backgroundColor: gradient,
+                        borderColor: '#3b82f6',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#3b82f6',
+                        pointHoverBackgroundColor: '#3b82f6',
+                        pointHoverBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 8,
+                        fill: true,
+                        tension: 0.4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1500,
+                        easing: 'easeInOutQuart'
+                    },
+                    scales: {
+                        y: { beginAtZero: false, min: 90, max: 100, grid: { color: '#e2e8f0' } },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: '#1e293b',
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 12 },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: false,
+                            callbacks: {
+                                label: (context) => `Success Rate: ${context.raw}%`
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
+                }
+            });
+            // --- DYNAMIC RECENT ACTIVITY LIST ---
+            const activityContainer = document.querySelector('.divide-y');
+            const activities = [
+                { file: 'server_backup.img', type: 'BTRFS', size: '120 GB', status: 'Completed', time: '2 hours ago' },
+                { file: 'user_partition.dd', type: 'XFS', size: '80 GB', status: 'In Progress', time: '5 hours ago' },
+                { file: 'external_drive.img', type: 'RAW', size: '500 GB', status: 'Failed', time: '1 day ago' },
+                { file: 'database_dump.bin', type: 'BTRFS', size: '60 GB', status: 'Completed', time: '2 days ago' },
+            ];
+            const statusClasses = {
+                'Completed': 'bg-green-100 text-green-800',
+                'In Progress': 'bg-yellow-100 text-yellow-800',
+                'Failed': 'bg-red-100 text-red-800',
+            };
+            
+            activities.forEach((activity, index) => {
+                const item = document.createElement('div');
+                item.className = 'p-4 hover:bg-slate-50 transition-colors reveal';
+                item.style.transitionDelay = `${index * 100 + 500}ms`;
+                item.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="font-semibold text-slate-700">${activity.file}</h4>
+                            <p class="text-sm text-slate-500">${activity.type} &bull; ${activity.size}</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <span class="px-3 py-1 text-sm rounded-full ${statusClasses[activity.status]}">${activity.status}</span>
+                            <span class="text-slate-500 text-sm">${activity.time}</span>
+                        </div>
+                    </div>
+                `;
+                activityContainer.appendChild(item);
+            });
+        });
+    </script>
+</body>
+</html>
