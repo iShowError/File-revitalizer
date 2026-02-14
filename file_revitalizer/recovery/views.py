@@ -27,9 +27,34 @@ def home(request):
     """Render the home page"""
     return render(request, 'home.html')
 
+@login_required
 def dashboard(request):
     """Render the dashboard page"""
-    return render(request, 'dashboard.html')
+    # Get or create user profile to ensure we have stats
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    
+    # Calculate stats
+    sessions = BTRFSRecoverySession.objects.filter(user=request.user)
+    total_recoveries = sessions.count()
+    active_jobs = sessions.filter(status='active').count()
+    completed_jobs = sessions.filter(status='completed').count()
+    
+    # Calculate success rate
+    success_rate = 0
+    if total_recoveries > 0:
+        success_rate = int((completed_jobs / total_recoveries) * 100)
+    
+    # Calculate recovered data in TB (roughly)
+    data_recovered_tb = round(profile.bytes_recovered / (1024**4), 2)
+    
+    context = {
+        'total_recoveries': total_recoveries,
+        'active_jobs': active_jobs,
+        'success_rate': success_rate,
+        'data_recovered_tb': data_recovered_tb,
+    }
+    
+    return render(request, 'dashboard.html', context)
 
 # Authentication Views
 

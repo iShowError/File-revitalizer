@@ -127,9 +127,15 @@
                 <a href="#how-it-works" class="text-slate-600 hover:text-blue-600 font-medium transition-colors">How It Works</a>
                 <a href="#ai-diagnosis" class="text-slate-600 hover:text-blue-600 font-medium transition-colors">✨ AI Diagnosis</a>
             </nav>
+            {% if user.is_authenticated %}
             <a href="{% url 'dashboard' %}" class="magnetic-button hidden md:inline-block bg-slate-800 text-white font-semibold px-6 py-3 rounded-full hover:bg-slate-900 transition-all duration-300 shadow-lg">
                 <span>Go to Dashboard</span>
             </a>
+            {% else %}
+            <a href="{% url 'login' %}" class="magnetic-button hidden md:inline-block bg-white text-slate-800 font-semibold px-6 py-3 rounded-full hover:bg-slate-50 border border-slate-200 transition-all duration-300 shadow-md">
+                <span>Sign In</span>
+            </a>
+            {% endif %}
         </div>
     </header>
 
