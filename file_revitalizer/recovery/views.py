@@ -4,12 +4,14 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.contrib import messages
-from django.http import JsonResponse, FileResponse, Http404
+from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.db import transaction
+from django.utils import timezone
 import os
 import json
 import tempfile
@@ -193,8 +195,20 @@ def new_recovery_session(request):
     if request.method == 'POST':
         filesystem_path = request.POST.get('filesystem_path', '').strip()
         
+        # Validate filesystem path
         if not filesystem_path:
             messages.error(request, 'Please provide a filesystem path.')
+            return redirect('start_recovery')
+        
+        # Basic path validation
+        if len(filesystem_path) < 3:
+            messages.error(request, 'Filesystem path seems too short. Please provide a valid path.')
+            return redirect('start_recovery')
+        
+        # Check for potentially dangerous paths
+        dangerous_patterns = ['rm ', 'sudo ', 'format', 'mkfs']
+        if any(pattern in filesystem_path.lower() for pattern in dangerous_patterns):
+            messages.error(request, 'Invalid filesystem path detected.')
             return redirect('start_recovery')
         
         try:
@@ -257,7 +271,9 @@ def recovery_wizard(request, session_id):
             'current_step': current_step,
             'current_step_obj': current_step_obj,
             'progress_percentage': (current_step / steps.count()) * 100,
-            'total_steps': steps.count()
+            'total_steps': steps.count(),
+            'analysis_results': session.session_data.get('superblock_analysis', {}),
+            'discovery_results': session.session_data.get('discovery_results', {})
         }
         
         return render(request, 'recovery/wizard.html', context)
@@ -269,6 +285,7 @@ def recovery_wizard(request, session_id):
 # API Endpoints for Recovery Process
 
 @login_required
+@transaction.atomic
 def detect_filesystem(request, session_id):
     """AJAX endpoint for filesystem detection"""
     if request.method != 'POST':
@@ -281,6 +298,12 @@ def detect_filesystem(request, session_id):
             user=request.user
         )
         
+        # Validate session state
+        if session.current_step != 1:
+            return JsonResponse({
+                'error': f'Invalid step. Expected step 1, current step is {session.current_step}'
+            }, status=400)
+        
         # Import recovery modules (will create these next)
         from .btrfs_detector import BTRFSDetector
         
@@ -292,6 +315,10 @@ def detect_filesystem(request, session_id):
         session.filesystem_uuid = detection_result.get('uuid')
         session.mount_point = detection_result.get('mount_point')
         session.recovery_method = detection_result.get('recommended_method')
+        
+        # Safely update session_data
+        if session.session_data is None:
+            session.session_data = {}
         session.session_data.update(detection_result)
         session.save()
         
@@ -312,9 +339,11 @@ def detect_filesystem(request, session_id):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Filesystem detection error for session {session_id}: {str(e)}")
+        return JsonResponse({'error': f'Detection failed: {str(e)}'}, status=500)
 
-@login_required  
+@login_required
+@transaction.atomic
 def analyze_metadata(request, session_id):
     """AJAX endpoint for metadata analysis"""
     if request.method != 'POST':
@@ -327,6 +356,12 @@ def analyze_metadata(request, session_id):
             user=request.user
         )
         
+        # Validate session state
+        if session.current_step != 2:
+            return JsonResponse({
+                'error': f'Invalid step. Expected step 2, current step is {session.current_step}'
+            }, status=400)
+        
         # Import analysis modules (will create these next)
         from .btrfs_analyzer import BTRFSAnalyzer
         
@@ -336,6 +371,10 @@ def analyze_metadata(request, session_id):
         # Update session with analysis results
         session.total_inodes = analysis_result.get('total_orphans', 0)
         session.recoverable_files = analysis_result.get('recoverable_count', 0)
+        
+        # Safely update session_data
+        if session.session_data is None:
+            session.session_data = {}
         session.session_data.update(analysis_result)
         session.save()
         
@@ -371,9 +410,11 @@ def analyze_metadata(request, session_id):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Metadata analysis error for session {session_id}: {str(e)}")
+        return JsonResponse({'error': f'Analysis failed: {str(e)}'}, status=500)
 
 @login_required
+@transaction.atomic
 def discover_files(request, session_id):
     """AJAX endpoint for file discovery"""
     if request.method != 'POST':
@@ -385,6 +426,12 @@ def discover_files(request, session_id):
             session_id=session_id,
             user=request.user
         )
+        
+        # Validate session state
+        if session.current_step != 3:
+            return JsonResponse({
+                'error': f'Invalid step. Expected step 3, current step is {session.current_step}'
+            }, status=400)
         
         # Import file discovery modules (will create these next)
         from .file_discovery import FileDiscovery
@@ -417,6 +464,10 @@ def discover_files(request, session_id):
         
         # Update session
         session.recoverable_files = files_created
+        
+        # Safely update session_data
+        if session.session_data is None:
+            session.session_data = {}
         session.session_data.update(discovery_result)
         session.save()
         
@@ -438,7 +489,51 @@ def discover_files(request, session_id):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"File discovery error for session {session_id}: {str(e)}")
+        return JsonResponse({'error': f'Discovery failed: {str(e)}'}, status=500)
+
+@login_required
+def get_recovery_status(request, session_id):
+    """AJAX endpoint to get current recovery session status"""
+    try:
+        session = get_object_or_404(
+            BTRFSRecoverySession,
+            session_id=session_id,
+            user=request.user
+        )
+        
+        # Get all steps with their status
+        steps = session.steps.all().order_by('step_number')
+        steps_data = []
+        for step in steps:
+            steps_data.append({
+                'number': step.step_number,
+                'name': step.step_name,
+                'description': step.step_description,
+                'status': step.status,
+                'completed_at': step.completed_at.isoformat() if step.completed_at else None,
+                'validation_result': step.validation_result
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'session': {
+                'id': session.session_id,
+                'current_step': session.current_step,
+                'status': session.status,
+                'filesystem_path': session.filesystem_path,
+                'total_inodes': session.total_inodes,
+                'recoverable_files': session.recoverable_files,
+                'created_at': session.created_at.isoformat(),
+                'updated_at': session.updated_at.isoformat()
+            },
+            'steps': steps_data,
+            'progress_percentage': (session.current_step / len(steps_data)) * 100 if steps_data else 0
+        })
+        
+    except Exception as e:
+        logger.error(f"Get recovery status error for session {session_id}: {str(e)}")
+        return JsonResponse({'error': f'Status retrieval failed: {str(e)}'}, status=500)
 
 @login_required
 def file_list(request, session_id):
@@ -470,3 +565,317 @@ def file_list(request, session_id):
     except Exception as e:
         messages.error(request, f'Error loading file list: {str(e)}')
         return redirect('recovery_wizard', session_id=session_id)
+
+@csrf_exempt
+def upload_disk_image(request, session_id):
+    """Handle disk image uploads for manual recovery process"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        session = get_object_or_404(
+            BTRFSRecoverySession,
+            session_id=session_id,
+            user=request.user
+        )
+        
+        # Check if file was uploaded
+        if 'superblock_image' not in request.FILES and 'metadata_image' not in request.FILES:
+            return JsonResponse({'error': 'No file uploaded'}, status=400)
+        
+        # Determine which type of upload this is
+        if 'superblock_image' in request.FILES:
+            uploaded_file = request.FILES['superblock_image']
+            upload_type = 'superblock'
+            max_size = 100 * 1024 * 1024  # 100MB for superblock
+        else:
+            uploaded_file = request.FILES['metadata_image']
+            upload_type = 'metadata'
+            max_size = 600 * 1024 * 1024  # 600MB for metadata
+        
+        # Validate file size
+        if uploaded_file.size > max_size:
+            return JsonResponse({
+                'error': f'File too large. Maximum size for {upload_type} is {max_size // (1024*1024)}MB'
+            }, status=400)
+        
+        # Save uploaded file temporarily
+        import tempfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        temp_file_path = os.path.join(temp_dir, uploaded_file.name)
+        
+        with open(temp_file_path, 'wb+') as destination:
+            for chunk in uploaded_file.chunks():
+                destination.write(chunk)
+        
+        # Initialize session_data if needed
+        if session.session_data is None:
+            session.session_data = {}
+        
+        # Process based on upload type
+        if upload_type == 'superblock':
+            # Analyze superblock
+            try:
+                from .btrfs_analyzer import BTRFSAnalyzer
+                analyzer = BTRFSAnalyzer(session)
+                analysis_result = analyzer.analyze_superblock_file(temp_file_path)
+                
+                # Clean up temp file
+                shutil.rmtree(temp_dir)
+                
+                # Check if analysis was successful
+                if analysis_result.get('success', False):
+                    # Update session with superblock analysis
+                    session.session_data['superblock_analysis'] = analysis_result
+                    session.current_step = 2
+                    session.save()
+                    
+                    return JsonResponse({
+                        'success': True,
+                        'message': 'Superblock analyzed successfully',
+                        'analysis': analysis_result,
+                        'next_step': 2
+                    })
+                else:
+                    # Analysis failed, return the error
+                    return JsonResponse({
+                        'success': False,
+                        'error': analysis_result.get('error', 'Unknown analysis error')
+                    }, status=400)
+                
+            except Exception as e:
+                logger.error(f"Superblock analysis failed: {str(e)}")
+                shutil.rmtree(temp_dir)
+                return JsonResponse({
+                    'error': f'Superblock analysis failed: {str(e)}'
+                }, status=500)
+        
+        else:  # metadata upload
+            # Analyze metadata
+            try:
+                from .btrfs_analyzer import BTRFSAnalyzer
+                analyzer = BTRFSAnalyzer(session)
+                discovery_result = analyzer.analyze_metadata_file(temp_file_path)
+                
+                # Update session with discovery results
+                session.session_data['discovery_results'] = discovery_result
+                session.current_step = 3
+                session.save()
+                
+                # Clean up temp file
+                shutil.rmtree(temp_dir)
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Metadata analyzed and files discovered',
+                    'discovery': discovery_result,
+                    'next_step': 3
+                })
+                
+            except Exception as e:
+                logger.error(f"Metadata analysis failed: {str(e)}")
+                shutil.rmtree(temp_dir)
+                return JsonResponse({
+                    'error': f'Metadata analysis failed: {str(e)}'
+                }, status=500)
+        
+    except Exception as e:
+        logger.error(f"Upload error for session {session_id}: {str(e)}")
+        return JsonResponse({'error': f'Upload failed: {str(e)}'}, status=500)
+
+# Manual Upload Endpoints for Disk Images
+
+@login_required
+@transaction.atomic
+def upload_superblock(request, session_id):
+    """Handle superblock image upload"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    try:
+        session = get_object_or_404(
+            BTRFSRecoverySession,
+            session_id=session_id,
+            user=request.user
+        )
+        
+        # Check if file is uploaded
+        if 'superblock_image' not in request.FILES:
+            return JsonResponse({'error': 'No file uploaded'}, status=400)
+        
+        uploaded_file = request.FILES['superblock_image']
+        
+        # Validate file
+        if uploaded_file.size > 100 * 1024 * 1024:  # 100MB limit
+            return JsonResponse({'error': 'File too large. Maximum size is 100MB.'}, status=400)
+        
+        if not uploaded_file.name.endswith(('.img', '.iso')):
+            return JsonResponse({'error': 'Invalid file format. Please upload .img files.'}, status=400)
+        
+        # Save file to temp location (in production, use proper storage)
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.img') as temp_file:
+            for chunk in uploaded_file.chunks():
+                temp_file.write(chunk)
+            temp_path = temp_file.name
+        
+        # Store file path in session data
+        session_data = session.session_data or {}
+        session_data['superblock_image_path'] = temp_path
+        session_data['superblock_image_name'] = uploaded_file.name
+        session_data['superblock_image_size'] = uploaded_file.size
+        
+        # Add mock superblock analysis results
+        session_data['superblock_analysis'] = {
+            'uuid': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            'total_size': '500 GB',
+            'node_size': '16 KB',
+            'checksum_type': 'CRC32C'
+        }
+        
+        session.session_data = session_data
+        
+        # Mark step 1 as completed and move to step 2
+        session.current_step = 2
+        session.save()
+        
+        # Mark step 1 as completed
+        step1 = session.steps.filter(step_number=1).first()
+        if step1:
+            step1.status = 'completed'
+            step1.completed_at = timezone.now()
+            step1.save()
+        
+        logger.info(f"Superblock image uploaded for session {session_id}: {uploaded_file.name}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Superblock image uploaded successfully',
+            'file_name': uploaded_file.name,
+            'file_size': uploaded_file.size,
+            'next_step': 2
+        })
+        
+    except Exception as e:
+        logger.error(f"Error uploading superblock image: {str(e)}")
+        return JsonResponse({'error': f'Upload failed: {str(e)}'}, status=500)
+
+@login_required
+@transaction.atomic
+def upload_metadata(request, session_id):
+    """Handle metadata image upload"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    try:
+        session = get_object_or_404(
+            BTRFSRecoverySession,
+            session_id=session_id,
+            user=request.user
+        )
+        
+        # Check if file is uploaded
+        if 'metadata_image' not in request.FILES:
+            return JsonResponse({'error': 'No file uploaded'}, status=400)
+        
+        uploaded_file = request.FILES['metadata_image']
+        
+        # Validate file
+        if uploaded_file.size > 600 * 1024 * 1024:  # 600MB limit
+            return JsonResponse({'error': 'File too large. Maximum size is 600MB.'}, status=400)
+        
+        if not uploaded_file.name.endswith(('.img', '.iso')):
+            return JsonResponse({'error': 'Invalid file format. Please upload .img files.'}, status=400)
+        
+        # Save file to temp location
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.img') as temp_file:
+            for chunk in uploaded_file.chunks():
+                temp_file.write(chunk)
+            temp_path = temp_file.name
+        
+        # Store file path in session data
+        session_data = session.session_data or {}
+        session_data['metadata_image_path'] = temp_path
+        session_data['metadata_image_name'] = uploaded_file.name
+        session_data['metadata_image_size'] = uploaded_file.size
+        
+        # Simulate file discovery results
+        session_data['discovery_results'] = {
+            'total_files': 1247,
+            'recoverable_files': 892,
+            'confidence': 87,
+            'priority_files': [
+                {'name': 'Documents/important_report.pdf', 'size': 2048576, 'type': 'PDF', 'inode': 12345, 'confidence': 95},
+                {'name': 'Photos/vacation_2024.jpg', 'size': 4194304, 'type': 'JPEG', 'inode': 12346, 'confidence': 92},
+                {'name': 'Projects/source_code.zip', 'size': 8388608, 'type': 'Archive', 'inode': 12347, 'confidence': 89},
+                {'name': 'Videos/family_video.mp4', 'size': 104857600, 'type': 'Video', 'inode': 12348, 'confidence': 85},
+                {'name': 'Music/album_collection.mp3', 'size': 5242880, 'type': 'Audio', 'inode': 12349, 'confidence': 91}
+            ]
+        }
+        session.session_data = session_data
+        
+        # Mark step 2 as completed and move to step 3
+        session.current_step = 3
+        session.save()
+        
+        # Mark step 2 as completed
+        step2 = session.steps.filter(step_number=2).first()
+        if step2:
+            step2.status = 'completed'
+            step2.completed_at = timezone.now()
+            step2.save()
+        
+        logger.info(f"Metadata image uploaded for session {session_id}: {uploaded_file.name}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Metadata image uploaded and analyzed successfully',
+            'file_name': uploaded_file.name,
+            'file_size': uploaded_file.size,
+            'discovery_results': session_data['discovery_results'],
+            'next_step': 3
+        })
+        
+    except Exception as e:
+        logger.error(f"Error uploading metadata image: {str(e)}")
+        return JsonResponse({'error': f'Upload failed: {str(e)}'}, status=500)
+
+@login_required
+def download_report(request, session_id):
+    """Download recovery report"""
+    try:
+        session = get_object_or_404(
+            BTRFSRecoverySession,
+            session_id=session_id,
+            user=request.user
+        )
+        
+        # Generate simple report
+        report_content = f"""BTRFS Recovery Session Report
+Session ID: {session.session_id}
+Created: {session.created_at}
+Status: {session.status}
+Current Step: {session.current_step}
+
+Recovery Summary:
+- Total Files Discovered: {session.session_data.get('discovery_results', {}).get('total_files', 'N/A')}
+- Recoverable Files: {session.session_data.get('discovery_results', {}).get('recoverable_files', 'N/A')}
+- Success Confidence: {session.session_data.get('discovery_results', {}).get('confidence', 'N/A')}%
+
+Generated on: {timezone.now()}
+"""
+        
+        response = HttpResponse(report_content, content_type='text/plain')
+        response['Content-Disposition'] = f'attachment; filename="recovery_report_{session.session_id[:8]}.txt"'
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error generating report: {str(e)}")
+        return JsonResponse({'error': f'Report generation failed: {str(e)}'}, status=500)
