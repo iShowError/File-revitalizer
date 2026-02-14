@@ -7,6 +7,10 @@ def generate_session_id():
     """Generate a unique session ID for recovery sessions"""
     return str(uuid.uuid4())
 
+def default_session_data():
+    """Return default empty dict for session_data field"""
+    return {}
+
 # Create your models here.
 
 class BTRFSRecoverySession(models.Model):
@@ -36,7 +40,7 @@ class BTRFSRecoverySession(models.Model):
     # Analysis results
     total_inodes = models.BigIntegerField(default=0)
     recoverable_files = models.BigIntegerField(default=0)
-    session_data = models.JSONField(default=dict)  # Analysis results storage
+    session_data = models.JSONField(default=default_session_data)  # Fixed: Use function instead of lambda
     
     # Recovery method used
     recovery_method = models.CharField(max_length=20, choices=[
