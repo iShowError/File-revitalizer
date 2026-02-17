@@ -456,31 +456,26 @@
                 aiResultEl.classList.remove('hidden');
                 aiLoaderEl.classList.remove('hidden');
                 aiResponseContentEl.classList.add('hidden');
-                const fullPrompt = `You are an expert data recovery technician named 'Revitalizer AI'. A user is describing their data loss problem. Based on their description, provide a professional and helpful analysis in three distinct sections. Use markdown for formatting.
-                1.  **Diagnosis:** A brief, technical diagnosis of the likely problem.
-                2.  **Recovery Chance:** An estimated recovery probability (e.g., High, Medium, Low) with a short explanation.
-                3.  **Recommended Next Step:** A clear next step, which should always guide the user towards using the FileRevitalizer application.
-                Keep the tone helpful, reassuring, and professional.
-                User's problem: "${userPrompt}"`;
+                
                 try {
-                    let chatHistory = [{ role: "user", parts: [{ text: fullPrompt }] }];
-                    const payload = { contents: chatHistory };
-                    const apiKey = "";
-                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-                    
-                    const response = await fetch(apiUrl, {
+                    const response = await fetch('/recovery/api/diagnose/', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken') // Function to get CSRF token
+                        },
+                        body: JSON.stringify({ prompt: userPrompt })
                     });
+
                     if (!response.ok) {
-                        throw new Error(`API Error: ${response.statusText}`);
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `API Error: ${response.statusText}`);
                     }
+                    
                     const result = await response.json();
                     
-                    if (result.candidates && result.candidates.length > 0) {
-                        const text = result.candidates[0].content.parts[0].text;
-                        let html = text
+                    if (result.response) {
+                        let html = result.response
                             .replace(/\*\*(.*?)\*\*/g, '<h4>$1</h4>')
                             .replace(/\n/g, '<br>');
                         aiResponseContentEl.innerHTML = html;
@@ -488,13 +483,29 @@
                         throw new Error('No content received from the API.');
                     }
                 } catch (error) {
-                    console.error("Gemini API call failed:", error);
-                    aiResponseContentEl.innerHTML = `<p class="text-red-500">Sorry, something went wrong. The AI expert is currently unavailable. Please try again later.</p>`;
+                    console.error("AI API call failed:", error);
+                    aiResponseContentEl.innerHTML = `<p class="text-red-500">Sorry, something went wrong. The AI expert is currently unavailable. Please try again later. Error: ${error.message}</p>`;
                 } finally {
                     aiLoaderEl.classList.add('hidden');
                     aiResponseContentEl.classList.remove('hidden');
                 }
             });
+
+            // Helper function to get CSRF token
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
         });
     </script>
 </body>

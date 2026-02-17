@@ -16,6 +16,9 @@ import os
 import json
 import tempfile
 import logging
+
+from dotenv import load_dotenv
+import requests
 from .models import BTRFSRecoverySession, RecoveryStep, RecoverableFile, BTRFSAnalysis, UserProfile
 from .recovery_engine import RecoveryEngine
 
@@ -904,3 +907,98 @@ Generated on: {timezone.now()}
     except Exception as e:
         logger.error(f"Error generating report: {str(e)}")
         return JsonResponse({'error': f'Report generation failed: {str(e)}'}, status=500)
+
+@csrf_exempt
+def diagnose_issue(request):
+    """Handle AI-based data loss diagnosis using a configurable provider."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST method is allowed.'}, status=405)
+
+    try:
+        # --- Load Configuration ---
+        load_dotenv(override=True)
+        api_key = os.getenv("AI_PROVIDER_API_KEY")
+        api_url_template = os.getenv("AI_PROVIDER_API_URL")
+        model = os.getenv("AI_PROVIDER_MODEL")
+
+        if not all([api_key, api_url_template, model]):
+            logger.error("AI provider environment variables are not fully configured.")
+            return JsonResponse({'error': 'AI service is not configured.'}, status=500)
+
+        # --- Get User Input ---
+        data = json.loads(request.body)
+        user_prompt = data.get('prompt')
+        if not user_prompt:
+            return JsonResponse({'error': 'Prompt is missing.'}, status=400)
+
+        # --- Prepare Prompt and Headers ---
+        full_prompt = f"""You are an expert data recovery technician named 'Revitalizer AI'. A user is describing their data loss problem. Based on their description, provide a professional and helpful analysis in three distinct sections. Use markdown for formatting.
+1.  **Diagnosis:** A brief, technical diagnosis of the likely problem.
+2.  **Recovery Chance:** An estimated recovery probability (e.g., High, Medium, Low) with a short explanation.
+3.  **Recommended Next Step:** A clear next step, which should always guide the user towards using the FileRevitalizer application.
+Keep the tone helpful, reassuring, and professional.
+User's problem: "{user_prompt}"
+"""
+        headers = {
+            'Content-Type': 'application/json',
+        }
+        
+        # --- Build Provider-Specific Payload and URL ---
+        if "openrouter" in api_url_template:
+            # OpenRouter uses a bearer token
+            headers['Authorization'] = f"Bearer {api_key}"
+            payload = {
+                "model": model,
+                "messages": [{"role": "user", "content": full_prompt}]
+            }
+            api_url = api_url_template
+        elif "google" in api_url_template:
+            # Google Gemini uses an API key in the URL
+            payload = {
+                "contents": [{"role": "user", "parts": [{"text": full_prompt}]}]
+            }
+            api_url = api_url_template.format(api_key=api_key)
+        else:
+            # Default to a generic bearer token format
+            headers['Authorization'] = f"Bearer {api_key}"
+            payload = {
+                "model": model,
+                "messages": [{"role": "user", "content": full_prompt}]
+            }
+            api_url = api_url_template
+
+        # --- Make API Call ---
+        response = requests.post(api_url, json=payload, headers=headers)
+        if not response.ok:
+            provider_error = response.text
+            try:
+                provider_payload = response.json()
+                provider_error = provider_payload.get('error', {}).get('message', provider_error)
+            except Exception:
+                pass
+            logger.error(f"AI API request failed ({response.status_code}): {provider_error}")
+            return JsonResponse({'error': f'AI provider error ({response.status_code}): {provider_error}'}, status=502)
+
+        result = response.json()
+
+        # --- Process Response ---
+        if "openrouter" in api_url_template:
+            text = result['choices'][0]['message']['content']
+        elif "google" in api_url_template:
+            text = result['candidates'][0]['content']['parts'][0]['text']
+        else: # A generic guess for other providers
+            text = result.get('choices', [{}])[0].get('message', {}).get('content', 'Could not parse response.')
+
+        return JsonResponse({'response': text})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON in request body.'}, status=400)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"AI API request failed: {e}")
+        return JsonResponse({'error': f'Failed to communicate with AI service: {e}'}, status=502)
+    except (KeyError, IndexError) as e:
+        logger.error(f"Failed to parse AI response: {e}. Response: {result}")
+        return JsonResponse({'error': 'Invalid response from AI service.'}, status=500)
+    except Exception as e:
+        logger.error(f"An unexpected error occurred in diagnose_issue: {e}")
+        return JsonResponse({'error': 'An internal server error occurred.'}, status=500)

@@ -23,4 +23,5 @@ urlpatterns = [
     path('api/recovery/<str:session_id>/discover/', views.discover_files, name='api_discover_files'),
     path('api/recovery/<str:session_id>/status/', views.get_recovery_status, name='api_get_recovery_status'),
     path('recovery/api/<str:session_id>/upload/', views.upload_disk_image, name='upload_disk_image'),
+    path('recovery/api/diagnose/', views.diagnose_issue, name='diagnose_issue'),
 ]
