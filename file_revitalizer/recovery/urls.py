@@ -41,4 +41,10 @@ urlpatterns = [
     # -----------------------------------------------------------------------
     path('api/cases/<int:case_id>/generate-candidates/', views.generate_candidates, name='api_generate_candidates'),
     path('cases/<int:case_id>/candidates/', views.candidates_view, name='candidates_view'),
+
+    # -----------------------------------------------------------------------
+    # Phase 6 — One-file recovery result page
+    # -----------------------------------------------------------------------
+    path('cases/<int:case_id>/recover/<int:candidate_id>/result/',
+         views.recovery_result_view, name='recovery_result_view'),
 ]

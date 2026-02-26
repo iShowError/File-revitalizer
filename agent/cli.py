@@ -83,6 +83,19 @@ def build_parser():
     upload_p.add_argument('--command', default='',
                           help='Command that produced this file (for audit log)')
 
+    # ── execute ─────────────────────────────────────────────────────────────
+    exec_p = subparsers.add_parser(
+        'execute',
+        help='Run server-provided recovery commands (whitelisted)',
+    )
+    _add_common_args(exec_p)
+    exec_p.add_argument('--commands', required=True,
+                        help='JSON array of shell commands to execute')
+    exec_p.add_argument('--candidate-id', type=int, default=None,
+                        help='CandidateFile ID (for result reporting)')
+    exec_p.add_argument('--case-id', type=int, default=None,
+                        help='RecoveryCase ID (for result reporting)')
+
     return parser
 
 
@@ -115,6 +128,23 @@ def main():
             artifact_type=args.artifact_type,
             case_id=args.case_id,
             source_command=args.command if hasattr(args, 'command') else '',
+        )
+        sys.exit(0 if success else 1)
+
+    elif args.command == 'execute':
+        import json as _json
+        from commands.execute import run as run_execute
+        try:
+            commands = _json.loads(args.commands)
+        except Exception:
+            print('[execute] --commands must be a valid JSON array of strings.')
+            sys.exit(1)
+        success = run_execute(
+            server=args.server,
+            token=args.token,
+            commands=commands,
+            candidate_id=args.candidate_id,
+            case_id=args.case_id,
         )
         sys.exit(0 if success else 1)
 

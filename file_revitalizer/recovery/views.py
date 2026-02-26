@@ -1175,8 +1175,8 @@ def candidate_list(request, case_id):
 @csrf_exempt
 def recover_file(request, case_id, candidate_id):
     """POST /api/cases/<id>/recover/<candidate_id>/
-    Triggers one-file recovery for the given CandidateFile.
-    Command generation + agent bridge wired in Phase 6.
+    Generates recovery commands and returns them + renders result page URL.
+    Full agent execution bridge in Phase 6.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
@@ -1187,15 +1187,23 @@ def recover_file(request, case_id, candidate_id):
     if candidate.status == CandidateFile.STATUS_RECOVERED:
         return JsonResponse({'error': 'File already recovered.'}, status=400)
 
-    # Stub — full implementation in Phase 6
+    from .command_generator import generate_all_commands
+    strategies = generate_all_commands(
+        candidate=candidate,
+        device=case.device_path,
+    )
+
     _audit(case, request.user, AuditEvent.EVENT_RECOVERY_COMMAND,
-           f'Recovery requested for candidate #{candidate.pk} ({candidate.file_name})',
-           {'candidate_id': candidate.pk, 'inode': candidate.inode_number})
+           f'Recovery commands generated for candidate #{candidate.pk} ({candidate.file_name})',
+           {'candidate_id': candidate.pk, 'inode': candidate.inode_number,
+            'strategy_types': [s['type'] for s in strategies]})
 
     return JsonResponse({
-        'message': 'Recovery queued. Command generation will be available in Phase 6.',
+        'message': 'Recovery commands generated.',
         'candidate': serialize_candidate(candidate),
-    }, status=202)
+        'strategies': strategies,
+        'result_url': f'/cases/{case_id}/recover/{candidate_id}/result/',
+    }, status=200)
 
 
 @login_required
@@ -1247,4 +1255,34 @@ def candidates_view(request, case_id):
         'case': case,
         'candidates': candidates,
         'file_types': file_types,
+    })
+
+
+# ===========================================================================
+# Phase 6 — One-File Recovery Result
+# ===========================================================================
+
+@login_required
+def recovery_result_view(request, case_id, candidate_id):
+    """GET /cases/<id>/recover/<candidate_id>/result/
+    Renders the recovery result page with generated shell commands.
+    """
+    import json as json_mod
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    candidate = get_object_or_404(CandidateFile, pk=candidate_id, case=case)
+
+    from .command_generator import generate_all_commands
+    strategies = generate_all_commands(
+        candidate=candidate,
+        device=case.device_path,
+    )
+
+    # Pre-serialise commands list for JS copy-to-clipboard
+    commands_json = json_mod.dumps([s.get('commands', []) for s in strategies])
+
+    return render(request, 'recovery/recovery_result.html', {
+        'case': case,
+        'candidate': candidate,
+        'strategies': strategies,
+        'commands_json': commands_json,
     })
