@@ -47,4 +47,10 @@ urlpatterns = [
     # -----------------------------------------------------------------------
     path('cases/<int:case_id>/recover/<int:candidate_id>/result/',
          views.recovery_result_view, name='recovery_result_view'),
+
+    # -----------------------------------------------------------------------
+    # Phase 7 — Grounded chatbot
+    # -----------------------------------------------------------------------
+    path('cases/<int:case_id>/chat/', views.chat_view, name='chat_view'),
+    path('api/cases/<int:case_id>/chat/', views.chat_message, name='api_chat_message'),
 ]

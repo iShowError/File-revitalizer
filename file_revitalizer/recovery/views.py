@@ -1286,3 +1286,145 @@ def recovery_result_view(request, case_id, candidate_id):
         'strategies': strategies,
         'commands_json': commands_json,
     })
+
+
+# ===========================================================================
+# Phase 7 — Grounded Chatbot
+# ===========================================================================
+
+@login_required
+def chat_view(request, case_id):
+    """GET /cases/<id>/chat/  → Render the grounded chatbot UI."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+
+    # Get or create a ChatSession for this user+case
+    session, _ = ChatSession.objects.get_or_create(
+        case=case, user=request.user
+    )
+
+    history = session.messages.order_by('created_at')
+    artifacts = case.artifacts.order_by('-uploaded_at')
+    top_candidate = case.candidates.order_by('-confidence').first()
+
+    return render(request, 'recovery/chat.html', {
+        'case': case,
+        'session_id': session.pk,
+        'history': history,
+        'artifacts': artifacts,
+        'candidate_count': case.candidates.count(),
+        'top_candidate': top_candidate,
+    })
+
+
+@login_required
+@csrf_exempt
+def chat_message(request, case_id):
+    """POST /api/cases/<id>/chat/
+    Body: { "message": "how do I recover this file?", "session_id": 1 }
+    Returns: { "response": "..." }
+
+    Injects live case context into the system prompt before calling the AI.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    user_message = data.get('message', '').strip()
+    if not user_message:
+        return JsonResponse({'error': '"message" is required.'}, status=400)
+
+    session_id = data.get('session_id')
+    if session_id:
+        chat_session = get_object_or_404(ChatSession, pk=session_id, case=case)
+    else:
+        chat_session, _ = ChatSession.objects.get_or_create(case=case, user=request.user)
+
+    # Build grounded system prompt
+    from .context_builder import build_system_prompt, build_context
+    system_prompt = build_system_prompt(case)
+    context_snapshot = build_context(case)
+
+    # Persist user message
+    ChatMessage.objects.create(
+        session=chat_session,
+        role=ChatMessage.ROLE_USER,
+        content=user_message,
+        context_snapshot=context_snapshot,
+    )
+
+    # Build conversation history (last 10 messages for context window)
+    recent_messages = list(
+        chat_session.messages.order_by('-created_at')[:10]
+    )[::-1]
+    conversation = [
+        {'role': msg.role, 'content': msg.content}
+        for msg in recent_messages
+        if msg.role in (ChatMessage.ROLE_USER, ChatMessage.ROLE_ASSISTANT)
+    ]
+
+    # Call AI provider (same pattern as diagnose_issue)
+    load_dotenv(override=True)
+    api_key = os.environ.get('AI_PROVIDER_API_KEY', '')
+    api_url = os.environ.get('AI_PROVIDER_API_URL', '')
+    model = os.environ.get('AI_PROVIDER_MODEL', 'google/gemma-3-12b-it:free')
+
+    if not api_key or not api_url:
+        return JsonResponse({'error': 'AI provider not configured.'}, status=503)
+
+    messages_payload = [
+        {'role': 'system', 'content': system_prompt},
+        *conversation,
+    ]
+
+    is_openrouter = 'openrouter' in api_url
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+    if is_openrouter:
+        headers['HTTP-Referer'] = 'https://file-revitalizer.local'
+        headers['X-Title'] = 'File Revitalizer'
+
+    payload = {'model': model, 'messages': messages_payload}
+
+    try:
+        resp = requests.post(api_url, headers=headers, json=payload, timeout=60)
+
+        if not resp.ok:
+            err_msg = resp.text[:300]
+            try:
+                err_msg = resp.json().get('error', {}).get('message', err_msg)
+            except Exception:
+                pass
+            raise ValueError(f'AI provider error {resp.status_code}: {err_msg}')
+
+        result = resp.json()
+        ai_response = (
+            result.get('choices', [{}])[0]
+                  .get('message', {})
+                  .get('content', 'Could not parse AI response.')
+        )
+
+    except (requests.exceptions.RequestException, ValueError) as e:
+        logger.error(f'Chat AI call failed: {e}')
+        return JsonResponse({'error': str(e)}, status=502)
+
+    # Persist assistant response
+    ChatMessage.objects.create(
+        session=chat_session,
+        role=ChatMessage.ROLE_ASSISTANT,
+        content=ai_response,
+        context_snapshot={},
+    )
+
+    _audit(case, request.user, AuditEvent.EVENT_CHAT,
+           f'Chat message in session #{chat_session.pk}',
+           {'session_id': chat_session.pk, 'message_preview': user_message[:100]})
+
+    return JsonResponse({'response': ai_response, 'session_id': chat_session.pk})
