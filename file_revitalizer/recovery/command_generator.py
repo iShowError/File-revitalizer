@@ -47,6 +47,34 @@ def _safe_filename(name: str) -> str:
     return name or 'recovered_file'
 
 
+def _assert_safe(commands: list) -> None:
+    """Raise ValueError if any non-comment command starts with a disallowed binary.
+
+    This is a defence-in-depth check — the primary whitelist is enforced in
+    agent/commands/execute.py.  We double-check here so that a bug in the
+    generator itself cannot produce a command that would pass the agent's
+    filter.
+
+    Comment lines (starting with '#') and empty lines are ignored.
+    Shell utility helpers (mkdir, cat, rm, truncate, echo) are permitted.
+    """
+    _SHELL_UTILS = frozenset(['mkdir', 'cat', 'rm', 'truncate', 'echo'])
+
+    for cmd in commands:
+        stripped = cmd.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        binary = stripped.split()[0]
+        binary_name = os.path.basename(binary)
+        if binary_name in _SHELL_UTILS:
+            continue
+        if binary_name not in ALLOWED_COMMANDS:
+            raise ValueError(
+                f"Unsafe command rejected by whitelist: {binary_name!r}. "
+                f"Allowed recovery binaries: {sorted(ALLOWED_COMMANDS)}"
+            )
+
+
 def generate_dd_command(candidate, device: str,
                         sector_size: int = DEFAULT_SECTOR_SIZE,
                         output_dir: str = '/tmp/recovered') -> dict:
@@ -92,6 +120,7 @@ def generate_dd_command(candidate, device: str,
                 f'File size ({candidate.file_size}B) may differ from extent length ({length}B). '
                 'Truncate if needed: truncate -s {candidate.file_size} ' + output_file
             )
+        _assert_safe(result['commands'])
         return result
 
     # ── Multi-extent ─────────────────────────────────────────────────────────
@@ -131,6 +160,7 @@ def generate_dd_command(candidate, device: str,
         f'Multi-extent recovery ({len(valid_extents)} extents). '
         'File may be corrupted if extents are not all intact.'
     )
+    _assert_safe(result['commands'])
     return result
 
 
@@ -142,14 +172,15 @@ def generate_btrfs_restore_command(candidate, device: str,
     Returns a dict with 'commands' and 'warnings'.
     """
     gen_flag = f'-t {generation} ' if generation else ''
-    cmd = f'btrfs restore {gen_flag}{device} {output_dir}'
+    cmds = [
+        f'mkdir -p {output_dir}',
+        f'btrfs restore {gen_flag}{device} {output_dir}',
+        f'# Then look for: {candidate.reconstructed_path or candidate.file_name}',
+    ]
+    _assert_safe(cmds)
     return {
         'type': 'btrfs_restore',
-        'commands': [
-            f'mkdir -p {output_dir}',
-            cmd,
-            f'# Then look for: {candidate.reconstructed_path or candidate.file_name}',
-        ],
+        'commands': cmds,
         'output_file': f'{output_dir}/{candidate.file_name or "recovered"}',
         'warnings': [
             'btrfs restore recovers all files; filter for your target afterwards.',

@@ -97,9 +97,9 @@ def build_system_prompt(case: RecoveryCase) -> str:
     ) if sb else 'not yet parsed'
 
     cands = ctx['candidates']
+    top_file_part = f', top file: {cands["top_file"]}' if cands.get('top_file') else ''
     cand_summary = (
-        f"{cands['total']} total, {cands['high_confidence']} high-confidence"
-        f"{f', top file: {cands[\"top_file\"]}' if cands['top_file'] else ''}"
+        f"{cands['total']} total, {cands['high_confidence']} high-confidence{top_file_part}"
     ) if cands['total'] else 'none generated yet'
 
     recent = '\n'.join(
