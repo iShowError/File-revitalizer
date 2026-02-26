@@ -35,4 +35,10 @@ urlpatterns = [
     path('api/cases/<int:case_id>/candidates/', views.candidate_list, name='api_candidate_list'),
     path('api/cases/<int:case_id>/recover/<int:candidate_id>/', views.recover_file, name='api_recover_file'),
     path('api/cases/<int:case_id>/audit/', views.audit_log, name='api_audit_log'),
+
+    # -----------------------------------------------------------------------
+    # Phase 5 — Candidate table
+    # -----------------------------------------------------------------------
+    path('api/cases/<int:case_id>/generate-candidates/', views.generate_candidates, name='api_generate_candidates'),
+    path('cases/<int:case_id>/candidates/', views.candidates_view, name='candidates_view'),
 ]

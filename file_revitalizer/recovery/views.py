@@ -1204,3 +1204,47 @@ def audit_log(request, case_id):
     case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
     events = case.audit_events.order_by('created_at')
     return JsonResponse({'events': [serialize_audit_event(e) for e in events]})
+
+
+# ===========================================================================
+# Phase 5 — Candidate Table
+# ===========================================================================
+
+@login_required
+@csrf_exempt
+def generate_candidates(request, case_id):
+    """POST /api/cases/<id>/generate-candidates/
+    Runs the reconstruction engine against the case’s parsed artifacts
+    and upserts CandidateFile rows.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+
+    from .reconstruction import reconstruct_candidates
+    result = reconstruct_candidates(case)
+
+    _audit(case, request.user, AuditEvent.EVENT_CANDIDATE_GENERATED,
+           f'Candidate generation: created={result["created"]} updated={result["updated"]}',
+           result)
+
+    return JsonResponse(result)
+
+
+@login_required
+def candidates_view(request, case_id):
+    """GET /cases/<id>/candidates/  → Rendered candidate table UI."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    candidates = case.candidates.order_by('-confidence', '-file_size')
+
+    # Collect unique file types for the filter dropdown
+    file_types = sorted(
+        set(c.file_type for c in candidates if c.file_type and c.file_type != 'unknown')
+    )
+
+    return render(request, 'recovery/candidates.html', {
+        'case': case,
+        'candidates': candidates,
+        'file_types': file_types,
+    })
