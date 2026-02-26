@@ -19,8 +19,12 @@ import logging
 
 from dotenv import load_dotenv
 import requests
-from .models import BTRFSRecoverySession, RecoveryStep, RecoverableFile, BTRFSAnalysis, UserProfile
+from .models import (
+    BTRFSRecoverySession, RecoveryStep, RecoverableFile, BTRFSAnalysis, UserProfile,
+    RecoveryCase, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent,
+)
 from .recovery_engine import RecoveryEngine
+from .serializers import serialize_case, serialize_artifact, serialize_candidate, serialize_audit_event
 
 logger = logging.getLogger(__name__)
 
@@ -1002,3 +1006,201 @@ User's problem: "{user_prompt}"
     except Exception as e:
         logger.error(f"An unexpected error occurred in diagnose_issue: {e}")
         return JsonResponse({'error': 'An internal server error occurred.'}, status=500)
+
+
+# ===========================================================================
+# Phase 2 — Recovery Case REST API
+# ===========================================================================
+
+def _audit(case, user, event_type, summary, detail=None):
+    """Helper: append one AuditEvent row."""
+    AuditEvent.objects.create(
+        case=case,
+        user=user,
+        event_type=event_type,
+        summary=summary,
+        detail=detail or {},
+    )
+
+
+@login_required
+@csrf_exempt
+def case_list_create(request):
+    """GET /api/cases/         → list caller's cases (newest first)
+    POST /api/cases/         → create a new RecoveryCase
+    """
+    if request.method == 'GET':
+        cases = RecoveryCase.objects.filter(user=request.user).order_by('-created_at')
+        return JsonResponse({'cases': [serialize_case(c) for c in cases]})
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+        title = data.get('title', '').strip()
+        device_path = data.get('device_path', '').strip()
+        if not title or not device_path:
+            return JsonResponse({'error': 'title and device_path are required.'}, status=400)
+
+        case = RecoveryCase.objects.create(
+            user=request.user,
+            title=title,
+            device_path=device_path,
+            filesystem_uuid=data.get('filesystem_uuid', ''),
+            notes=data.get('notes', ''),
+        )
+        _audit(case, request.user, AuditEvent.EVENT_STATE_TRANSITION,
+               f'Case #{case.pk} created in state CREATED',
+               {'device_path': device_path})
+        return JsonResponse({'case': serialize_case(case)}, status=201)
+
+    return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+
+@login_required
+@csrf_exempt
+def case_detail(request, case_id):
+    """GET /api/cases/<id>/   → return case details + artifact/candidate counts."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    data = serialize_case(case)
+    data['artifact_count'] = case.artifacts.count()
+    data['candidate_count'] = case.candidates.count()
+    return JsonResponse({'case': data})
+
+
+@login_required
+@csrf_exempt
+def case_transition(request, case_id):
+    """POST /api/cases/<id>/transition/
+    Body: { "state": "SCANNING" }
+    Advances the state machine and records an AuditEvent.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    new_state = data.get('state', '').strip().upper()
+    if not new_state:
+        return JsonResponse({'error': '"state" is required.'}, status=400)
+
+    try:
+        case.transition_to(new_state)
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+    _audit(case, request.user, AuditEvent.EVENT_STATE_TRANSITION,
+           f'Case #{case.pk} transitioned to {new_state}',
+           {'previous_state': case.state, 'new_state': new_state})
+    return JsonResponse({'case': serialize_case(case)})
+
+
+@login_required
+@csrf_exempt
+def artifact_upload(request, case_id):
+    """POST /api/cases/<id>/artifacts/
+    Body: {
+        "artifact_type": "superblock",
+        "raw_data": "<text from btrfs command>",
+        "source_command": "btrfs inspect-internal dump-super /dev/sdb"  (optional)
+    }
+    Saves the artifact and schedules parsing (sync for now; async later).
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    artifact_type = data.get('artifact_type', Artifact.TYPE_OTHER)
+    raw_data = data.get('raw_data', '')
+    if not raw_data:
+        return JsonResponse({'error': '"raw_data" is required.'}, status=400)
+
+    artifact = Artifact.objects.create(
+        case=case,
+        artifact_type=artifact_type,
+        raw_data=raw_data,
+        source_command=data.get('source_command', ''),
+    )
+
+    _audit(case, request.user, AuditEvent.EVENT_ARTIFACT_UPLOAD,
+           f'Artifact [{artifact_type}] uploaded for Case #{case.pk}',
+           {'artifact_id': artifact.pk, 'artifact_type': artifact_type})
+
+    # Trigger parser (will be fully wired in Phase 4 — artifact pipeline)
+    try:
+        from .parsers import parse_artifact
+        parse_artifact(artifact)
+    except ImportError:
+        pass  # Parsers not yet implemented — silently skip
+    except Exception as parse_err:
+        logger.warning(f'Parser failed for artifact {artifact.pk}: {parse_err}')
+
+    return JsonResponse({'artifact': serialize_artifact(artifact)}, status=201)
+
+
+@login_required
+def candidate_list(request, case_id):
+    """GET /api/cases/<id>/candidates/
+    Optional query params: ?min_confidence=0.5&status=pending
+    """
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    qs = case.candidates.all()
+
+    min_conf = request.GET.get('min_confidence')
+    if min_conf:
+        try:
+            qs = qs.filter(confidence__gte=float(min_conf))
+        except ValueError:
+            pass
+
+    status_filter = request.GET.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+
+    return JsonResponse({'candidates': [serialize_candidate(c) for c in qs]})
+
+
+@login_required
+@csrf_exempt
+def recover_file(request, case_id, candidate_id):
+    """POST /api/cases/<id>/recover/<candidate_id>/
+    Triggers one-file recovery for the given CandidateFile.
+    Command generation + agent bridge wired in Phase 6.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    candidate = get_object_or_404(CandidateFile, pk=candidate_id, case=case)
+
+    if candidate.status == CandidateFile.STATUS_RECOVERED:
+        return JsonResponse({'error': 'File already recovered.'}, status=400)
+
+    # Stub — full implementation in Phase 6
+    _audit(case, request.user, AuditEvent.EVENT_RECOVERY_COMMAND,
+           f'Recovery requested for candidate #{candidate.pk} ({candidate.file_name})',
+           {'candidate_id': candidate.pk, 'inode': candidate.inode_number})
+
+    return JsonResponse({
+        'message': 'Recovery queued. Command generation will be available in Phase 6.',
+        'candidate': serialize_candidate(candidate),
+    }, status=202)
+
+
+@login_required
+def audit_log(request, case_id):
+    """GET /api/cases/<id>/audit/   → chronological audit trail for a case."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    events = case.audit_events.order_by('created_at')
+    return JsonResponse({'events': [serialize_audit_event(e) for e in events]})
