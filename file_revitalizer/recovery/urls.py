@@ -24,4 +24,33 @@ urlpatterns = [
     path('api/recovery/<str:session_id>/status/', views.get_recovery_status, name='api_get_recovery_status'),
     path('recovery/api/<str:session_id>/upload/', views.upload_disk_image, name='upload_disk_image'),
     path('recovery/api/diagnose/', views.diagnose_issue, name='diagnose_issue'),
+
+    # -----------------------------------------------------------------------
+    # Phase 2 — Recovery Case REST API
+    # -----------------------------------------------------------------------
+    path('api/cases/', views.case_list_create, name='api_case_list_create'),
+    path('api/cases/<int:case_id>/', views.case_detail, name='api_case_detail'),
+    path('api/cases/<int:case_id>/transition/', views.case_transition, name='api_case_transition'),
+    path('api/cases/<int:case_id>/artifacts/', views.artifact_upload, name='api_artifact_upload'),
+    path('api/cases/<int:case_id>/candidates/', views.candidate_list, name='api_candidate_list'),
+    path('api/cases/<int:case_id>/recover/<int:candidate_id>/', views.recover_file, name='api_recover_file'),
+    path('api/cases/<int:case_id>/audit/', views.audit_log, name='api_audit_log'),
+
+    # -----------------------------------------------------------------------
+    # Phase 5 — Candidate table
+    # -----------------------------------------------------------------------
+    path('api/cases/<int:case_id>/generate-candidates/', views.generate_candidates, name='api_generate_candidates'),
+    path('cases/<int:case_id>/candidates/', views.candidates_view, name='candidates_view'),
+
+    # -----------------------------------------------------------------------
+    # Phase 6 — One-file recovery result page
+    # -----------------------------------------------------------------------
+    path('cases/<int:case_id>/recover/<int:candidate_id>/result/',
+         views.recovery_result_view, name='recovery_result_view'),
+
+    # -----------------------------------------------------------------------
+    # Phase 7 — Grounded chatbot
+    # -----------------------------------------------------------------------
+    path('cases/<int:case_id>/chat/', views.chat_view, name='chat_view'),
+    path('api/cases/<int:case_id>/chat/', views.chat_message, name='api_chat_message'),
 ]

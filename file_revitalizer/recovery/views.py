@@ -19,8 +19,12 @@ import logging
 
 from dotenv import load_dotenv
 import requests
-from .models import BTRFSRecoverySession, RecoveryStep, RecoverableFile, BTRFSAnalysis, UserProfile
+from .models import (
+    BTRFSRecoverySession, RecoveryStep, RecoverableFile, BTRFSAnalysis, UserProfile,
+    RecoveryCase, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent,
+)
 from .recovery_engine import RecoveryEngine
+from .serializers import serialize_case, serialize_artifact, serialize_candidate, serialize_audit_event
 
 logger = logging.getLogger(__name__)
 
@@ -1002,3 +1006,425 @@ User's problem: "{user_prompt}"
     except Exception as e:
         logger.error(f"An unexpected error occurred in diagnose_issue: {e}")
         return JsonResponse({'error': 'An internal server error occurred.'}, status=500)
+
+
+# ===========================================================================
+# Phase 2 — Recovery Case REST API
+# ===========================================================================
+
+def _audit(case, user, event_type, summary, detail=None):
+    """Helper: append one AuditEvent row."""
+    AuditEvent.objects.create(
+        case=case,
+        user=user,
+        event_type=event_type,
+        summary=summary,
+        detail=detail or {},
+    )
+
+
+@login_required
+@csrf_exempt
+def case_list_create(request):
+    """GET /api/cases/         → list caller's cases (newest first)
+    POST /api/cases/         → create a new RecoveryCase
+    """
+    if request.method == 'GET':
+        cases = RecoveryCase.objects.filter(user=request.user).order_by('-created_at')
+        return JsonResponse({'cases': [serialize_case(c) for c in cases]})
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+        title = data.get('title', '').strip()
+        device_path = data.get('device_path', '').strip()
+        if not title or not device_path:
+            return JsonResponse({'error': 'title and device_path are required.'}, status=400)
+
+        case = RecoveryCase.objects.create(
+            user=request.user,
+            title=title,
+            device_path=device_path,
+            filesystem_uuid=data.get('filesystem_uuid', ''),
+            notes=data.get('notes', ''),
+        )
+        _audit(case, request.user, AuditEvent.EVENT_STATE_TRANSITION,
+               f'Case #{case.pk} created in state CREATED',
+               {'device_path': device_path})
+        return JsonResponse({'case': serialize_case(case)}, status=201)
+
+    return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+
+@login_required
+@csrf_exempt
+def case_detail(request, case_id):
+    """GET /api/cases/<id>/   → return case details + artifact/candidate counts."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    data = serialize_case(case)
+    data['artifact_count'] = case.artifacts.count()
+    data['candidate_count'] = case.candidates.count()
+    return JsonResponse({'case': data})
+
+
+@login_required
+@csrf_exempt
+def case_transition(request, case_id):
+    """POST /api/cases/<id>/transition/
+    Body: { "state": "SCANNING" }
+    Advances the state machine and records an AuditEvent.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    new_state = data.get('state', '').strip().upper()
+    if not new_state:
+        return JsonResponse({'error': '"state" is required.'}, status=400)
+
+    try:
+        case.transition_to(new_state)
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+    _audit(case, request.user, AuditEvent.EVENT_STATE_TRANSITION,
+           f'Case #{case.pk} transitioned to {new_state}',
+           {'previous_state': case.state, 'new_state': new_state})
+    return JsonResponse({'case': serialize_case(case)})
+
+
+@login_required
+@csrf_exempt
+def artifact_upload(request, case_id):
+    """POST /api/cases/<id>/artifacts/
+    Body: {
+        "artifact_type": "superblock",
+        "raw_data": "<text from btrfs command>",
+        "source_command": "btrfs inspect-internal dump-super /dev/sdb"  (optional)
+    }
+    Saves the artifact and schedules parsing (sync for now; async later).
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    artifact_type = data.get('artifact_type', Artifact.TYPE_OTHER)
+    raw_data = data.get('raw_data', '')
+    if not raw_data:
+        return JsonResponse({'error': '"raw_data" is required.'}, status=400)
+
+    artifact = Artifact.objects.create(
+        case=case,
+        artifact_type=artifact_type,
+        raw_data=raw_data,
+        source_command=data.get('source_command', ''),
+    )
+
+    _audit(case, request.user, AuditEvent.EVENT_ARTIFACT_UPLOAD,
+           f'Artifact [{artifact_type}] uploaded for Case #{case.pk}',
+           {'artifact_id': artifact.pk, 'artifact_type': artifact_type})
+
+    # Trigger parser (will be fully wired in Phase 4 — artifact pipeline)
+    try:
+        from .parsers import parse_artifact
+        parse_artifact(artifact)
+    except ImportError:
+        pass  # Parsers not yet implemented — silently skip
+    except Exception as parse_err:
+        logger.warning(f'Parser failed for artifact {artifact.pk}: {parse_err}')
+
+    return JsonResponse({'artifact': serialize_artifact(artifact)}, status=201)
+
+
+@login_required
+def candidate_list(request, case_id):
+    """GET /api/cases/<id>/candidates/
+    Optional query params: ?min_confidence=0.5&status=pending
+    """
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    qs = case.candidates.all()
+
+    min_conf = request.GET.get('min_confidence')
+    if min_conf:
+        try:
+            qs = qs.filter(confidence__gte=float(min_conf))
+        except ValueError:
+            pass
+
+    status_filter = request.GET.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+
+    return JsonResponse({'candidates': [serialize_candidate(c) for c in qs]})
+
+
+@login_required
+@csrf_exempt
+def recover_file(request, case_id, candidate_id):
+    """POST /api/cases/<id>/recover/<candidate_id>/
+    Generates recovery commands and returns them + renders result page URL.
+    Full agent execution bridge in Phase 6.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    candidate = get_object_or_404(CandidateFile, pk=candidate_id, case=case)
+
+    if candidate.status == CandidateFile.STATUS_RECOVERED:
+        return JsonResponse({'error': 'File already recovered.'}, status=400)
+
+    from .command_generator import generate_all_commands
+    strategies = generate_all_commands(
+        candidate=candidate,
+        device=case.device_path,
+    )
+
+    _audit(case, request.user, AuditEvent.EVENT_RECOVERY_COMMAND,
+           f'Recovery commands generated for candidate #{candidate.pk} ({candidate.file_name})',
+           {'candidate_id': candidate.pk, 'inode': candidate.inode_number,
+            'strategy_types': [s['type'] for s in strategies]})
+
+    return JsonResponse({
+        'message': 'Recovery commands generated.',
+        'candidate': serialize_candidate(candidate),
+        'strategies': strategies,
+        'result_url': f'/cases/{case_id}/recover/{candidate_id}/result/',
+    }, status=200)
+
+
+@login_required
+def audit_log(request, case_id):
+    """GET /api/cases/<id>/audit/   → chronological audit trail for a case."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    events = case.audit_events.order_by('created_at')
+    return JsonResponse({'events': [serialize_audit_event(e) for e in events]})
+
+
+# ===========================================================================
+# Phase 5 — Candidate Table
+# ===========================================================================
+
+@login_required
+@csrf_exempt
+def generate_candidates(request, case_id):
+    """POST /api/cases/<id>/generate-candidates/
+    Runs the reconstruction engine against the case’s parsed artifacts
+    and upserts CandidateFile rows.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+
+    from .reconstruction import reconstruct_candidates
+    result = reconstruct_candidates(case)
+
+    _audit(case, request.user, AuditEvent.EVENT_CANDIDATE_GENERATED,
+           f'Candidate generation: created={result["created"]} updated={result["updated"]}',
+           result)
+
+    return JsonResponse(result)
+
+
+@login_required
+def candidates_view(request, case_id):
+    """GET /cases/<id>/candidates/  → Rendered candidate table UI."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    candidates = case.candidates.order_by('-confidence', '-file_size')
+
+    # Collect unique file types for the filter dropdown
+    file_types = sorted(
+        set(c.file_type for c in candidates if c.file_type and c.file_type != 'unknown')
+    )
+
+    return render(request, 'recovery/candidates.html', {
+        'case': case,
+        'candidates': candidates,
+        'file_types': file_types,
+    })
+
+
+# ===========================================================================
+# Phase 6 — One-File Recovery Result
+# ===========================================================================
+
+@login_required
+def recovery_result_view(request, case_id, candidate_id):
+    """GET /cases/<id>/recover/<candidate_id>/result/
+    Renders the recovery result page with generated shell commands.
+    """
+    import json as json_mod
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    candidate = get_object_or_404(CandidateFile, pk=candidate_id, case=case)
+
+    from .command_generator import generate_all_commands
+    strategies = generate_all_commands(
+        candidate=candidate,
+        device=case.device_path,
+    )
+
+    # Pre-serialise commands list for JS copy-to-clipboard
+    commands_json = json_mod.dumps([s.get('commands', []) for s in strategies])
+
+    return render(request, 'recovery/recovery_result.html', {
+        'case': case,
+        'candidate': candidate,
+        'strategies': strategies,
+        'commands_json': commands_json,
+    })
+
+
+# ===========================================================================
+# Phase 7 — Grounded Chatbot
+# ===========================================================================
+
+@login_required
+def chat_view(request, case_id):
+    """GET /cases/<id>/chat/  → Render the grounded chatbot UI."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+
+    # Get or create a ChatSession for this user+case
+    session, _ = ChatSession.objects.get_or_create(
+        case=case, user=request.user
+    )
+
+    history = session.messages.order_by('created_at')
+    artifacts = case.artifacts.order_by('-uploaded_at')
+    top_candidate = case.candidates.order_by('-confidence').first()
+
+    return render(request, 'recovery/chat.html', {
+        'case': case,
+        'session_id': session.pk,
+        'history': history,
+        'artifacts': artifacts,
+        'candidate_count': case.candidates.count(),
+        'top_candidate': top_candidate,
+    })
+
+
+@login_required
+@csrf_exempt
+def chat_message(request, case_id):
+    """POST /api/cases/<id>/chat/
+    Body: { "message": "how do I recover this file?", "session_id": 1 }
+    Returns: { "response": "..." }
+
+    Injects live case context into the system prompt before calling the AI.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    user_message = data.get('message', '').strip()
+    if not user_message:
+        return JsonResponse({'error': '"message" is required.'}, status=400)
+
+    session_id = data.get('session_id')
+    if session_id:
+        chat_session = get_object_or_404(ChatSession, pk=session_id, case=case)
+    else:
+        chat_session, _ = ChatSession.objects.get_or_create(case=case, user=request.user)
+
+    # Build grounded system prompt
+    from .context_builder import build_system_prompt, build_context
+    system_prompt = build_system_prompt(case)
+    context_snapshot = build_context(case)
+
+    # Persist user message
+    ChatMessage.objects.create(
+        session=chat_session,
+        role=ChatMessage.ROLE_USER,
+        content=user_message,
+        context_snapshot=context_snapshot,
+    )
+
+    # Build conversation history (last 10 messages for context window)
+    recent_messages = list(
+        chat_session.messages.order_by('-created_at')[:10]
+    )[::-1]
+    conversation = [
+        {'role': msg.role, 'content': msg.content}
+        for msg in recent_messages
+        if msg.role in (ChatMessage.ROLE_USER, ChatMessage.ROLE_ASSISTANT)
+    ]
+
+    # Call AI provider (same pattern as diagnose_issue)
+    load_dotenv(override=True)
+    api_key = os.environ.get('AI_PROVIDER_API_KEY', '')
+    api_url = os.environ.get('AI_PROVIDER_API_URL', '')
+    model = os.environ.get('AI_PROVIDER_MODEL', 'google/gemma-3-12b-it:free')
+
+    if not api_key or not api_url:
+        return JsonResponse({'error': 'AI provider not configured.'}, status=503)
+
+    messages_payload = [
+        {'role': 'system', 'content': system_prompt},
+        *conversation,
+    ]
+
+    is_openrouter = 'openrouter' in api_url
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+    if is_openrouter:
+        headers['HTTP-Referer'] = 'https://file-revitalizer.local'
+        headers['X-Title'] = 'File Revitalizer'
+
+    payload = {'model': model, 'messages': messages_payload}
+
+    try:
+        resp = requests.post(api_url, headers=headers, json=payload, timeout=60)
+
+        if not resp.ok:
+            err_msg = resp.text[:300]
+            try:
+                err_msg = resp.json().get('error', {}).get('message', err_msg)
+            except Exception:
+                pass
+            raise ValueError(f'AI provider error {resp.status_code}: {err_msg}')
+
+        result = resp.json()
+        ai_response = (
+            result.get('choices', [{}])[0]
+                  .get('message', {})
+                  .get('content', 'Could not parse AI response.')
+        )
+
+    except (requests.exceptions.RequestException, ValueError) as e:
+        logger.error(f'Chat AI call failed: {e}')
+        return JsonResponse({'error': str(e)}, status=502)
+
+    # Persist assistant response
+    ChatMessage.objects.create(
+        session=chat_session,
+        role=ChatMessage.ROLE_ASSISTANT,
+        content=ai_response,
+        context_snapshot={},
+    )
+
+    _audit(case, request.user, AuditEvent.EVENT_CHAT,
+           f'Chat message in session #{chat_session.pk}',
+           {'session_id': chat_session.pk, 'message_preview': user_message[:100]})
+
+    return JsonResponse({'response': ai_response, 'session_id': chat_session.pk})
