@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Recovery Dashboard</title>
+    <title>Dashboard — File Revitalizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* Custom Font */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -80,8 +79,8 @@
                 <ul class="space-y-2">
                     <li><a href="{% url 'home' %}" class="flex items-center p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"><i class="fas fa-home w-6 text-center mr-3"></i>Home</a></li>
                     <li><a href="{% url 'dashboard' %}" class="flex items-center p-2 bg-blue-100 text-blue-700 font-semibold rounded-lg"><i class="fas fa-chart-pie w-6 text-center mr-3"></i>Dashboard</a></li>
-                    <li><a href="#" class="flex items-center p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"><i class="fas fa-history w-6 text-center mr-3"></i>History</a></li>
-                    <li><a href="#" class="flex items-center p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"><i class="fas fa-cog w-6 text-center mr-3"></i>Settings</a></li>
+                    <li><a href="/cases/" class="flex items-center p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"><i class="fas fa-folder-open w-6 text-center mr-3"></i>My Cases</a></li>
+                    <li><a href="{% url 'logout' %}" class="flex items-center p-2 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all"><i class="fas fa-sign-out-alt w-6 text-center mr-3"></i>Logout</a></li>
                 </ul>
             </nav>
         </div>
@@ -107,69 +106,112 @@
 
             <!-- Dashboard Content -->
             <main class="p-6">
+
+                <!-- New Case CTA -->
+                <div class="mb-8 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-700">Welcome back, {{ user.first_name|default:user.username }}</h3>
+                        <p class="text-slate-500 text-sm mt-1">Start a new recovery case or continue where you left off.</p>
+                    </div>
+                    <a href="/cases/" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition-colors">
+                        <i class="fas fa-plus"></i> New Recovery Case
+                    </a>
+                </div>
+
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-slate-500">Total Recoveries</p>
-                                <h3 class="text-3xl font-bold text-slate-800 number-scramble" data-value="{{ total_recoveries }}">0</h3>
+                                <p class="text-slate-500 text-sm">Total Cases</p>
+                                <h3 class="text-3xl font-bold text-slate-800 mt-1">{{ total_cases }}</h3>
                             </div>
-                            <div class="p-3 rounded-full bg-blue-100 text-blue-600"><i class="fas fa-hdd text-xl"></i></div>
+                            <div class="p-3 rounded-full bg-blue-100 text-blue-600"><i class="fas fa-folder-open text-xl"></i></div>
                         </div>
                     </div>
                     <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal" style="transition-delay: 100ms;">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-slate-500">Success Rate</p>
-                                <h3 class="text-3xl font-bold text-slate-800">
-                                    <span class="number-scramble" data-value="{{ success_rate }}">0</span>%
-                                </h3>
+                                <p class="text-slate-500 text-sm">In Progress</p>
+                                <h3 class="text-3xl font-bold text-yellow-600 mt-1">{{ active_cases }}</h3>
                             </div>
-                            <div class="p-3 rounded-full bg-green-100 text-green-600"><i class="fas fa-check-circle text-xl"></i></div>
+                            <div class="p-3 rounded-full bg-yellow-100 text-yellow-600"><i class="fas fa-sync-alt text-xl"></i></div>
                         </div>
                     </div>
                     <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal" style="transition-delay: 200ms;">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-slate-500">Data Recovered</p>
-                                <h3 class="text-3xl font-bold text-slate-800">
-                                    <span class="number-scramble" data-value="{{ data_recovered_tb }}">0</span> TB
-                                </h3>
+                                <p class="text-slate-500 text-sm">Completed</p>
+                                <h3 class="text-3xl font-bold text-green-600 mt-1">{{ completed_cases }}</h3>
                             </div>
-                            <div class="p-3 rounded-full bg-purple-100 text-purple-600"><i class="fas fa-database text-xl"></i></div>
+                            <div class="p-3 rounded-full bg-green-100 text-green-600"><i class="fas fa-check-circle text-xl"></i></div>
                         </div>
                     </div>
                     <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal" style="transition-delay: 300ms;">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-slate-500">Active Jobs</p>
-                                <h3 class="text-3xl font-bold text-slate-800 number-scramble" data-value="{{ active_jobs }}">0</h3>
+                                <p class="text-slate-500 text-sm">Failed</p>
+                                <h3 class="text-3xl font-bold text-red-500 mt-1">{{ failed_cases }}</h3>
                             </div>
-                            <div class="p-3 rounded-full bg-yellow-100 text-yellow-600"><i class="fas fa-spinner text-xl animate-spin"></i></div>
+                            <div class="p-3 rounded-full bg-red-100 text-red-500"><i class="fas fa-exclamation-circle text-xl"></i></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Chart -->
-                <div class="bg-white p-6 rounded-2xl shadow-md mb-8 reveal">
-                    <h3 class="text-lg font-bold text-slate-800 mb-4">Recovery Success Rate Over Time</h3>
-                    <div class="relative h-96"><canvas id="recoveryChart"></canvas></div>
+                <!-- Recent Cases -->
+                <div class="bg-white rounded-2xl shadow-md reveal">
+                    <div class="p-6 border-b flex items-center justify-between">
+                        <h3 class="text-lg font-bold text-slate-800">Recent Recovery Cases</h3>
+                        <a href="/cases/" class="text-sm text-blue-600 hover:underline">View all &rarr;</a>
+                    </div>
+                    {% if recent_cases %}
+                    <div class="divide-y divide-slate-100">
+                        {% for case in recent_cases %}
+                        <div class="p-4 hover:bg-slate-50 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="min-w-0">
+                                    <h4 class="font-semibold text-slate-700 truncate">{{ case.title }}</h4>
+                                    <p class="text-sm text-slate-400 mt-0.5 font-mono truncate">{{ case.device_path }}</p>
+                                </div>
+                                <div class="flex items-center gap-3 ml-4 flex-shrink-0">
+                                    {% if case.state == 'COMPLETE' %}
+                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Complete</span>
+                                    {% elif case.state == 'FAILED' %}
+                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700">Failed</span>
+                                    {% elif case.state == 'RECOVERING' %}
+                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-700">Recovering</span>
+                                    {% elif case.state == 'SCANNING' %}
+                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-700">Scanning</span>
+                                    {% elif case.state == 'ANALYZED' %}
+                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700">Analyzed</span>
+                                    {% else %}
+                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-600">Created</span>
+                                    {% endif %}
+                                    <span class="text-slate-400 text-xs">{{ case.created_at|date:"M d, Y" }}</span>
+                                    <a href="/cases/{{ case.pk }}/" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fas fa-arrow-right"></i></a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="p-12 text-center">
+                        <i class="fas fa-folder-open text-4xl text-slate-300 mb-3"></i>
+                        <p class="text-slate-500 mb-4">No recovery cases yet.</p>
+                        <a href="/cases/" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-plus"></i> Create your first case
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
 
-                <!-- Recent Activity -->
-                <div class="bg-white rounded-2xl shadow-md reveal">
-                    <div class="p-6 border-b"><h3 class="text-lg font-bold text-slate-800">Recent Recovery Jobs</h3></div>
-                    <div class="divide-y divide-slate-100">
-                        <!-- Activity Items will be dynamically added here by JS -->
-                    </div>
-                </div>
             </main>
         </div>
     </div>
 
     <script>
-        // --- NUMBER SCRAMBLE EFFECT ---
+        // --- SCROLL REVEAL ---
+        // (NumberScramble removed — stats now rendered server-side)
         class NumberScramble {
             constructor(el) {
                 this.el = el;
@@ -266,95 +308,7 @@
                     });
                 }
             });
-            // --- ADVANCED CHART.JS IMPLEMENTATION ---
-            const chartCtx = document.getElementById('recoveryChart').getContext('2d');
-            const gradient = chartCtx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
-            gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
-            const recoveryChart = new Chart(chartCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [{
-                        label: 'Success Rate',
-                        data: [92, 94, 96, 95, 97, 98],
-                        backgroundColor: gradient,
-                        borderColor: '#3b82f6',
-                        borderWidth: 3,
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: '#3b82f6',
-                        pointHoverBackgroundColor: '#3b82f6',
-                        pointHoverBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 8,
-                        fill: true,
-                        tension: 0.4,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: {
-                        duration: 1500,
-                        easing: 'easeInOutQuart'
-                    },
-                    scales: {
-                        y: { beginAtZero: false, min: 90, max: 100, grid: { color: '#e2e8f0' } },
-                        x: { grid: { display: false } }
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            enabled: true,
-                            backgroundColor: '#1e293b',
-                            titleFont: { size: 14, weight: 'bold' },
-                            bodyFont: { size: 12 },
-                            padding: 12,
-                            cornerRadius: 8,
-                            displayColors: false,
-                            callbacks: {
-                                label: (context) => `Success Rate: ${context.raw}%`
-                            }
-                        }
-                    },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index',
-                    },
-                }
-            });
-            // --- DYNAMIC RECENT ACTIVITY LIST ---
-            const activityContainer = document.querySelector('.divide-y');
-            const activities = [
-                { file: 'server_backup.img', type: 'BTRFS', size: '120 GB', status: 'Completed', time: '2 hours ago' },
-                { file: 'user_partition.dd', type: 'XFS', size: '80 GB', status: 'In Progress', time: '5 hours ago' },
-                { file: 'external_drive.img', type: 'RAW', size: '500 GB', status: 'Failed', time: '1 day ago' },
-                { file: 'database_dump.bin', type: 'BTRFS', size: '60 GB', status: 'Completed', time: '2 days ago' },
-            ];
-            const statusClasses = {
-                'Completed': 'bg-green-100 text-green-800',
-                'In Progress': 'bg-yellow-100 text-yellow-800',
-                'Failed': 'bg-red-100 text-red-800',
-            };
-            
-            activities.forEach((activity, index) => {
-                const item = document.createElement('div');
-                item.className = 'p-4 hover:bg-slate-50 transition-colors reveal';
-                item.style.transitionDelay = `${index * 100 + 500}ms`;
-                item.innerHTML = `
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h4 class="font-semibold text-slate-700">${activity.file}</h4>
-                            <p class="text-sm text-slate-500">${activity.type} &bull; ${activity.size}</p>
-                        </div>
-                        <div class="flex items-center space-x-4">
-                            <span class="px-3 py-1 text-sm rounded-full ${statusClasses[activity.status]}">${activity.status}</span>
-                            <span class="text-slate-500 text-sm">${activity.time}</span>
-                        </div>
-                    </div>
-                `;
-                activityContainer.appendChild(item);
-            });
+            // Recent cases are rendered server-side — no JS needed for the table.
         });
     </script>
 </body>
