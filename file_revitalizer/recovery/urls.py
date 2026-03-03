@@ -53,4 +53,10 @@ urlpatterns = [
     # -----------------------------------------------------------------------
     path('cases/<int:case_id>/chat/', views.chat_view, name='chat_view'),
     path('api/cases/<int:case_id>/chat/', views.chat_message, name='api_chat_message'),
+
+    # -----------------------------------------------------------------------
+    # Browser UI — Cases list and case detail pages
+    # -----------------------------------------------------------------------
+    path('cases/', views.cases_list_html, name='cases_list'),
+    path('cases/<int:case_id>/', views.case_detail_html, name='case_detail'),
 ]
