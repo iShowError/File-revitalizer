@@ -1,47 +1,7 @@
 from django.contrib import admin
 from .models import (
-    BTRFSRecoverySession, RecoveryStep, RecoverableFile, BTRFSAnalysis, UserProfile,
     RecoveryCase, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent,
 )
-
-
-# ── Legacy models ────────────────────────────────────────────────────────────
-
-@admin.register(BTRFSRecoverySession)
-class BTRFSRecoverySessionAdmin(admin.ModelAdmin):
-    list_display = ('session_id', 'user', 'filesystem_path', 'status', 'created_at')
-    list_filter = ('status', 'filesystem_type', 'recovery_method')
-    search_fields = ('session_id', 'user__username', 'filesystem_path')
-    readonly_fields = ('session_id', 'created_at', 'updated_at')
-    ordering = ('-created_at',)
-
-
-@admin.register(RecoveryStep)
-class RecoveryStepAdmin(admin.ModelAdmin):
-    list_display = ('session', 'step_number', 'step_name', 'status')
-    list_filter = ('status',)
-    ordering = ('session', 'step_number')
-
-
-@admin.register(RecoverableFile)
-class RecoverableFileAdmin(admin.ModelAdmin):
-    list_display = ('file_name', 'session', 'file_size', 'recovery_confidence', 'recovery_status')
-    list_filter = ('recovery_status', 'file_type')
-    search_fields = ('file_name', 'file_path')
-    ordering = ('-recovery_confidence',)
-
-
-@admin.register(BTRFSAnalysis)
-class BTRFSAnalysisAdmin(admin.ModelAdmin):
-    list_display = ('analysis_type', 'session', 'objectid', 'confidence_score', 'is_recoverable')
-    list_filter = ('analysis_type', 'is_recoverable')
-    ordering = ('-confidence_score',)
-
-
-@admin.register(UserProfile)
-class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'preferred_recovery_method', 'total_sessions', 'files_recovered')
-    search_fields = ('user__username',)
 
 
 # ── Phase 1: new deductive recovery models ───────────────────────────────────
