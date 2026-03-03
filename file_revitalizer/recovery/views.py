@@ -1414,3 +1414,30 @@ def chat_message(request, case_id):
            {'session_id': chat_session.pk, 'message_preview': user_message[:100]})
 
     return JsonResponse({'response': ai_response, 'session_id': chat_session.pk})
+
+
+# ===========================================================================
+# Browser HTML views — Cases list and Case detail
+# ===========================================================================
+
+@login_required
+def cases_list_html(request):
+    """GET /cases/  → Render the case list page."""
+    cases = RecoveryCase.objects.filter(user=request.user).order_by('-created_at')
+    return render(request, 'recovery/cases_list.html', {'cases': cases})
+
+
+@login_required
+def case_detail_html(request, case_id):
+    """GET /cases/<id>/  → Render the case detail page."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    allowed_transitions = RecoveryCase.TRANSITIONS.get(case.state, [])
+    artifacts = case.artifacts.order_by('-uploaded_at')
+    audit_events = case.audit_events.order_by('-created_at')[:5]
+    return render(request, 'recovery/case_detail.html', {
+        'case': case,
+        'allowed_transitions': allowed_transitions,
+        'artifacts': artifacts,
+        'audit_events': audit_events,
+        'candidate_count': case.candidates.count(),
+    })
