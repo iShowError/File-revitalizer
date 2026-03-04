@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/cases/<int:case_id>/transition/', views.case_transition, name='api_case_transition'),
     path('api/cases/<int:case_id>/artifacts/', views.artifact_upload, name='api_artifact_upload'),
     path('api/cases/<int:case_id>/candidates/', views.candidate_list, name='api_candidate_list'),
+    path('api/cases/<int:case_id>/candidates/<int:candidate_id>/', views.update_candidate_status, name='api_update_candidate_status'),
     path('api/cases/<int:case_id>/recover/<int:candidate_id>/', views.recover_file, name='api_recover_file'),
     path('api/cases/<int:case_id>/audit/', views.audit_log, name='api_audit_log'),
 
