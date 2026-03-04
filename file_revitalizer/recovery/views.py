@@ -430,6 +430,43 @@ def candidate_list(request, case_id):
 
 @login_required
 @csrf_exempt
+def update_candidate_status(request, case_id, candidate_id):
+    """PATCH /api/cases/<id>/candidates/<cid>/
+    Mark a candidate as 'skipped' or 'failed'. Does not allow setting
+    'recovered' here — that is done exclusively via recover_file.
+    """
+    if request.method != 'PATCH':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    candidate = get_object_or_404(CandidateFile, pk=candidate_id, case=case)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    new_status = data.get('status', '').strip()
+    allowed = {CandidateFile.STATUS_SKIPPED, CandidateFile.STATUS_FAILED}
+    if new_status not in allowed:
+        return JsonResponse(
+            {'error': f"Status must be one of: {', '.join(sorted(allowed))}"},
+            status=400,
+        )
+
+    old_status = candidate.status
+    candidate.status = new_status
+    candidate.save(update_fields=['status'])
+
+    _audit(case, request.user, AuditEvent.EVENT_RECOVERY_COMMAND,
+           f'Candidate #{candidate.pk} ({candidate.file_name}) marked {new_status}',
+           {'candidate_id': candidate.pk, 'old_status': old_status, 'new_status': new_status})
+
+    return JsonResponse({'candidate': serialize_candidate(candidate)})
+
+
+@login_required
+@csrf_exempt
 def recover_file(request, case_id, candidate_id):
     """POST /api/cases/<id>/recover/<candidate_id>/
     Generates recovery commands and returns them + renders result page URL.
