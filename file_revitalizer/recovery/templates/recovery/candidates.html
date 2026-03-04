@@ -56,6 +56,7 @@
         .btn:hover { opacity: .8; }
         .btn-primary { background: var(--accent); color: #fff; }
         .btn-success { background: var(--accent2); color: #000; }
+        .btn-warning { background: var(--warning); color: #000; }
         .btn-danger  { background: var(--danger); color: #fff; }
         .btn-sm { padding: .3rem .7rem; font-size: .78rem; }
         select, input[type=text] { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: .4rem .7rem; font-size: .85rem; }
@@ -162,6 +163,7 @@
                 <option value="pending">Pending</option>
                 <option value="recovered">Recovered</option>
                 <option value="failed">Failed</option>
+                <option value="skipped">Skipped</option>
             </select>
         </div>
         <div>
@@ -217,7 +219,7 @@
                         <span class="conf-label">{{ c.confidence|floatformat:2 }}</span>
                     </div>
                 </td>
-                <td>
+                <td id="status-{{ c.id }}">
                     <span class="s-{{ c.status }}">
                         {% if c.status == 'pending' %}<i class="fa fa-clock"></i>
                         {% elif c.status == 'recovered' %}<i class="fa fa-check-circle"></i>
@@ -226,11 +228,21 @@
                         {{ c.status|capfirst }}
                     </span>
                 </td>
-                <td>
+                <td id="actions-{{ c.id }}">
                     {% if c.status == 'pending' %}
                     <button class="btn btn-success btn-sm"
                             onclick="recoverFile({{ c.id }})">
                         <i class="fa fa-download"></i> Recover
+                    </button>
+                    <button class="btn btn-warning btn-sm"
+                            onclick="updateStatus({{ c.id }}, 'skipped')"
+                            title="Skip this candidate">
+                        <i class="fa fa-forward"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm"
+                            onclick="updateStatus({{ c.id }}, 'failed')"
+                            title="Mark as failed">
+                        <i class="fa fa-xmark"></i>
                     </button>
                     {% elif c.status == 'recovered' %}
                     <span style="color:#2ed573;font-size:.8rem"><i class="fa fa-check"></i> Done</span>
@@ -344,6 +356,31 @@ function generateCandidates() {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa fa-rotate"></i> Regenerate';
     });
+}
+
+// ── Update candidate status (skip / fail) ────────────────────────────────────
+function updateStatus(candidateId, status) {
+    const label = status === 'skipped' ? 'Skip' : 'Mark as failed';
+    if (!confirm(`${label} this candidate?`)) return;
+    fetch(`/api/cases/${CASE_ID}/candidates/${candidateId}/`, {
+        method: 'PATCH',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { showToast('Error: ' + data.error, true); return; }
+        const actionsCell = document.getElementById(`actions-${candidateId}`);
+        const statusCell  = document.getElementById(`status-${candidateId}`);
+        if (actionsCell?.closest('tr')) actionsCell.closest('tr').dataset.status = status;
+        if (statusCell) {
+            const icon = status === 'skipped' ? 'fa-minus' : 'fa-times-circle';
+            statusCell.innerHTML = `<span class="s-${status}"><i class="fa ${icon}"></i> ${status[0].toUpperCase() + status.slice(1)}</span>`;
+        }
+        if (actionsCell) actionsCell.innerHTML = `<span style="color:var(--text-muted);font-size:.8rem">—</span>`;
+        showToast(`Candidate marked ${status}.`);
+    })
+    .catch(e => showToast('Network error: ' + e, true));
 }
 
 // ── Recover file ───────────────────────────────────────────────────────────────
