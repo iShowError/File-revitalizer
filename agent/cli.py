@@ -6,9 +6,10 @@ device is connected). It communicates with the Django web server to upload
 artifacts and receive recovery instructions.
 
 Usage examples:
+    python cli.py list-devices
     python cli.py health  --server http://192.168.1.10:8000 --token <api_token>
     python cli.py scan    --device /dev/sdb --case-id 3 --server ... --token ...
-    python cli.py upload  --file superblock.json --type superblock --case-id 3 \\
+    python cli.py upload  --file superblock.json --type superblock --case-id 3 \
                           --server ... --token ...
 """
 import argparse
@@ -45,7 +46,13 @@ def build_parser():
     )
     subparsers = parser.add_subparsers(dest='command', required=True)
 
-    # ── health ──────────────────────────────────────────────────────────────
+    # ── list-devices ─────────────────────────────────────────────────────────
+    subparsers.add_parser(
+        'list-devices',
+        help='List block devices on this machine (uses lsblk)',
+    )
+
+    # ── health ─────────────────────────────────────────────────────────────
     health_p = subparsers.add_parser(
         'health',
         help='Check connectivity to server and report local tool availability',
@@ -103,7 +110,12 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    if args.command == 'health':
+    if args.command == 'list-devices':
+        from commands.list_devices import run as run_list_devices
+        success = run_list_devices()
+        sys.exit(0 if success else 1)
+
+    elif args.command == 'health':
         from commands.health import run as run_health
         success = run_health(args.server, args.token)
         sys.exit(0 if success else 1)
