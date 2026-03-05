@@ -11,6 +11,7 @@ from django.utils import timezone
 from .superblock import parse as parse_superblock
 from .chunk_tree import parse as parse_chunk_tree
 from .fs_tree import parse as parse_fs_tree
+from .extent_tree import parse as parse_extent_tree
 
 
 # Map artifact_type string → parser function
@@ -18,7 +19,8 @@ _PARSERS = {
     'superblock':   parse_superblock,
     'chunk_tree':   parse_chunk_tree,
     'fs_tree':      parse_fs_tree,
-    # extent_tree and find_root fall through to the generic handler
+    'extent_tree':  parse_extent_tree,
+    # find_root falls through to the generic handler
 }
 
 
