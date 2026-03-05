@@ -1,11 +1,13 @@
 """scan command — run BTRFS inspection commands and upload as artifacts.
 
 Runs on the user's Linux machine. Executes:
-  1. btrfs inspect-internal dump-super <device>       → superblock artifact
-  2. btrfs inspect-internal dump-super -a <device>    → all superblocks
-  3. btrfs-find-root <device>                         → find-root artifact
-  4. btrfs inspect-internal dump-tree -t chunk <device> → chunk_tree artifact
-     (skipped when --superblock-only)
+  1. btrfs inspect-internal dump-super <device>          → superblock artifact
+  2. btrfs inspect-internal dump-super -a <device>       → all superblocks
+  3. btrfs-find-root <device>                            → find-root artifact
+  4. btrfs inspect-internal dump-tree -t chunk <device>  → chunk_tree artifact
+  5. btrfs inspect-internal dump-tree -t fs <device>     → fs_tree artifact
+  6. btrfs inspect-internal dump-tree -t extent <device> → extent_tree artifact
+     (steps 3–6 skipped when --superblock-only)
 
 Each result is uploaded to /api/cases/<id>/artifacts/ on the web server.
 """
@@ -130,6 +132,26 @@ def run(server: str, token: str, device: str, case_id: int,
             errors.append('Failed to upload FS tree artifact.')
     else:
         print(f'  [–] FS tree skipped: {err or "no output"}')
+
+    # ── 5. Extent tree ───────────────────────────────────────────────────────
+    # Provides logical→extent mappings with inode back-references.
+    # Enables more precise physical address resolution than the chunk map alone.
+    cmd = ['btrfs', 'inspect-internal', 'dump-tree', '-t', 'extent', device]
+    print(f'\n  Running: {" ".join(cmd)}')
+    ok, out, err = _run_cmd(cmd, timeout=600)
+    if ok and out:
+        success = upload_raw(
+            server=server, token=token, case_id=case_id,
+            raw_data=out, artifact_type='extent_tree',
+            source_command=' '.join(cmd),
+        )
+        if success:
+            uploaded += 1
+            print('  [✓] Extent tree artifact uploaded.')
+        else:
+            errors.append('Failed to upload extent tree artifact.')
+    else:
+        print(f'  [–] extent tree skipped: {err or "no output"}')
 
     # ── Summary ──────────────────────────────────────────────────────────────
     print(f'\n[scan] Uploaded {uploaded} artifact(s).')
