@@ -16,13 +16,18 @@ import argparse
 import sys
 import os
 
-# Allow running as `python agent/cli.py` from the repo root
-sys.path.insert(0, os.path.dirname(__file__))
+# Resolve the real directory of this script (works under PyInstaller --onefile too)
+if getattr(sys, 'frozen', False):
+    _AGENT_DIR = os.path.dirname(sys.executable)
+else:
+    _AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
+    # Allow running as `python agent/cli.py` from the repo root
+    sys.path.insert(0, _AGENT_DIR)
 
 from dotenv import load_dotenv
 
 # Load .env from the agent directory if present (TOKEN, SERVER_URL)
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv(os.path.join(_AGENT_DIR, '.env'))
 
 
 def _add_common_args(parser):
@@ -44,6 +49,7 @@ def build_parser():
         prog='file-revitalizer-agent',
         description='Local recovery agent for File Revitalizer',
     )
+    parser.add_argument('--version', action='version', version='%(prog)s 0.2.0')
     subparsers = parser.add_subparsers(dest='command', required=True)
 
     # ── list-devices ─────────────────────────────────────────────────────────
