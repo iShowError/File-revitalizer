@@ -6,11 +6,13 @@ The server sends a command string via:
 
 This module:
 1. Validates each command against the whitelist (ALLOWED_COMMANDS).
-2. Executes each command sequentially.
-3. Returns stdout/stderr for each command.
-4. Refuses to run anything not in the whitelist.
+2. Rejects shell metacharacters (no pipes, chains, redirections).
+3. Executes each command sequentially (without shell=True).
+4. Returns stdout/stderr for each command.
+5. Refuses to run anything not in the whitelist.
 """
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -21,38 +23,56 @@ try:
 except ImportError:
     sys.exit('requests is not installed. Run: pip install -r requirements.txt')
 
-# Mirror of server-side whitelist in command_generator.py
-ALLOWED_COMMANDS = frozenset(['dd', 'btrfs', 'btrfs-find-root', 'btrfs-restore',
-                               'mkdir', 'cat', 'rm', 'truncate'])
+# Only genuinely safe, read-oriented recovery tools.
+# dd is write-capable but essential for block-level extraction (of= targets
+# are validated separately).  No destructive tools (rm, truncate, etc.).
+ALLOWED_COMMANDS = frozenset([
+    'dd', 'btrfs', 'btrfs-find-root', 'btrfs-restore', 'mkdir', 'cat',
+])
+
+# Shell metacharacters that indicate command chaining / redirection.
+# We reject the entire command if any of these appear outside of quotes.
+_SHELL_META = re.compile(r'[;|&`$><\n]')
 
 
-def _is_allowed(command_str: str) -> bool:
-    """Return True if the first token of the command is in ALLOWED_COMMANDS."""
+def _is_allowed(command_str: str) -> tuple[bool, str]:
+    """Validate a command string. Returns (allowed, reason)."""
+    # Reject shell metacharacters first (before any parsing)
+    if _SHELL_META.search(command_str):
+        return False, 'contains shell metacharacters (;|&`$><)'
+
     try:
         tokens = shlex.split(command_str)
-    except ValueError:
-        return False
+    except ValueError as e:
+        return False, f'cannot parse command: {e}'
+
     if not tokens:
-        return False
+        return False, 'empty command'
+
     binary = os.path.basename(tokens[0])
-    return binary in ALLOWED_COMMANDS
+    if binary not in ALLOWED_COMMANDS:
+        return False, f'"{binary}" not in whitelist: {sorted(ALLOWED_COMMANDS)}'
+
+    return True, ''
 
 
 def _run_single(cmd_str: str, timeout: int = 300) -> dict:
-    """Execute one shell command. Returns {command, returncode, stdout, stderr}."""
-    if not _is_allowed(cmd_str):
+    """Execute one command (without shell). Returns result dict."""
+    allowed, reason = _is_allowed(cmd_str)
+    if not allowed:
         return {
             'command': cmd_str,
             'returncode': -1,
             'stdout': '',
-            'stderr': f'BLOCKED: command not in whitelist. Allowed: {sorted(ALLOWED_COMMANDS)}',
+            'stderr': f'BLOCKED: {reason}',
             'blocked': True,
         }
 
     try:
+        tokens = shlex.split(cmd_str)
         result = subprocess.run(
-            cmd_str,
-            shell=True,
+            tokens,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -70,6 +90,14 @@ def _run_single(cmd_str: str, timeout: int = 300) -> dict:
             'returncode': -1,
             'stdout': '',
             'stderr': f'Command timed out after {timeout}s.',
+            'blocked': False,
+        }
+    except FileNotFoundError:
+        return {
+            'command': cmd_str,
+            'returncode': -1,
+            'stdout': '',
+            'stderr': f'Command not found: {tokens[0]}',
             'blocked': False,
         }
     except Exception as e:

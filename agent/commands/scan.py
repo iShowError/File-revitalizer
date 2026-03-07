@@ -2,20 +2,19 @@
 
 Runs on the user's Linux machine. Executes:
   1. btrfs inspect-internal dump-super <device>          → superblock artifact
-  2. btrfs inspect-internal dump-super -a <device>       → all superblocks
-  3. btrfs-find-root <device>                            → find-root artifact
-  4. btrfs inspect-internal dump-tree -t chunk <device>  → chunk_tree artifact
-  5. btrfs inspect-internal dump-tree -t fs <device>     → fs_tree artifact
-  6. btrfs inspect-internal dump-tree -t extent <device> → extent_tree artifact
-     (steps 3–6 skipped when --superblock-only)
+  2. btrfs-find-root <device>                            → find-root artifact
+  3. btrfs inspect-internal dump-tree -t chunk <device>  → chunk_tree artifact
+  4. btrfs inspect-internal dump-tree -t fs <device>     → fs_tree artifact
+  5. btrfs inspect-internal dump-tree -t extent <device> → extent_tree artifact
+     (steps 2–5 skipped when --superblock-only)
 
 Each result is uploaded to /api/cases/<id>/artifacts/ on the web server.
 """
 import json
+import os
+import re
 import subprocess
 import sys
-import tempfile
-import os
 
 try:
     import requests
@@ -23,6 +22,18 @@ except ImportError:
     sys.exit('requests is not installed. Run: pip install -r requirements.txt')
 
 from .upload import upload_raw
+
+# Strict pattern: /dev/sdX, /dev/nvmeXnYpZ, /dev/vdX, /dev/loopN, etc.
+_DEVICE_RE = re.compile(r'^/dev/[a-zA-Z0-9/_-]+$')
+
+
+def _validate_device(device: str) -> bool:
+    """Return True if device looks like a valid block device path."""
+    if not _DEVICE_RE.match(device):
+        return False
+    if '..' in device:
+        return False
+    return True
 
 
 def _run_cmd(cmd: list, timeout: int = 120) -> tuple[bool, str, str]:
@@ -47,6 +58,12 @@ def run(server: str, token: str, device: str, case_id: int,
         superblock_only: bool = False) -> bool:
     """Execute scan and upload all artifacts. Returns True if at least one
     artifact was uploaded successfully."""
+
+    # Validate device path before running any commands
+    if not _validate_device(device):
+        print(f'[scan] ERROR: Invalid device path: {device}')
+        print('  Device must be a /dev/ path (e.g. /dev/sdb, /dev/nvme0n1p2)')
+        return False
 
     print(f'\n[scan] Device: {device}  |  Case ID: {case_id}')
     print(f'[scan] Server: {server}')
@@ -79,13 +96,15 @@ def run(server: str, token: str, device: str, case_id: int,
         return uploaded > 0
 
     # ── 2. btrfs-find-root ───────────────────────────────────────────────────
+    # NOTE: btrfs-find-root writes its output to stderr, not stdout.
     cmd = ['btrfs-find-root', device]
     print(f'\n  Running: {" ".join(cmd)}')
     ok, out, err = _run_cmd(cmd, timeout=60)
-    if ok and out:
+    find_root_output = out or err  # prefer stdout, fall back to stderr
+    if find_root_output:
         success = upload_raw(
             server=server, token=token, case_id=case_id,
-            raw_data=out, artifact_type='find_root',
+            raw_data=find_root_output, artifact_type='find_root',
             source_command=' '.join(cmd),
         )
         if success:
@@ -95,7 +114,7 @@ def run(server: str, token: str, device: str, case_id: int,
             errors.append('Failed to upload find-root artifact.')
     else:
         # Non-fatal — btrfs-find-root may not be available everywhere
-        print(f'  [–] btrfs-find-root skipped: {err or "no output"}')
+        print('  [–] btrfs-find-root skipped: no output')
 
     # ── 3. Chunk tree ────────────────────────────────────────────────────────
     cmd = ['btrfs', 'inspect-internal', 'dump-tree', '-t', 'chunk', device]
