@@ -49,6 +49,7 @@
         .msg-user { align-self: flex-end; background: var(--accent); color: #fff; padding: .75rem 1rem; border-radius: 14px 14px 4px 14px; }
         .msg-assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); padding: .75rem 1rem; border-radius: 4px 14px 14px 14px; white-space: pre-wrap; }
         .msg-system { align-self: center; font-size: .75rem; color: var(--text-muted); font-style: italic; }
+        .msg-error { align-self: center; font-size: .8rem; color: var(--danger); font-style: italic; background: rgba(255,71,87,.08); border: 1px solid rgba(255,71,87,.2); padding: .5rem 1rem; border-radius: 8px; }
         .msg-time { font-size: .68rem; color: var(--text-muted); margin-top: .3rem; text-align: right; }
 
         /* ── input bar ── */
@@ -195,7 +196,15 @@ function sendMessage() {
     .then(data => {
         typing.style.display = 'none';
         if (data.error) {
-            addMessage('system', 'Error: ' + data.error);
+            const isRateLimit = data.error.toLowerCase().includes('busy') || data.error.toLowerCase().includes('429');
+            const errorText = isRateLimit
+                ? 'The AI service is busy right now — please try again in a few seconds.'
+                : data.error;
+            addMessage('error', errorText);
+            // Auto-remove error after 7 seconds
+            const msgs = document.getElementById('messages');
+            const errorEl = msgs.querySelector('.msg-error:last-of-type');
+            if (errorEl) setTimeout(() => { errorEl.style.transition = 'opacity .5s'; errorEl.style.opacity = '0'; setTimeout(() => errorEl.remove(), 500); }, 7000);
         } else {
             addMessage('assistant', data.response,
                 new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
@@ -203,7 +212,10 @@ function sendMessage() {
     })
     .catch(e => {
         typing.style.display = 'none';
-        addMessage('system', 'Network error: ' + e);
+        addMessage('error', 'Network error — check your connection and try again.');
+        const msgs = document.getElementById('messages');
+        const errorEl = msgs.querySelector('.msg-error:last-of-type');
+        if (errorEl) setTimeout(() => { errorEl.style.transition = 'opacity .5s'; errorEl.style.opacity = '0'; setTimeout(() => errorEl.remove(), 500); }, 7000);
     })
     .finally(() => { btn.disabled = false; });
 }

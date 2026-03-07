@@ -18,6 +18,7 @@ import tempfile
 import logging
 
 from dotenv import load_dotenv
+import time
 import requests
 from .models import (
     RecoveryCase, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent,
@@ -25,6 +26,18 @@ from .models import (
 from .serializers import serialize_case, serialize_artifact, serialize_candidate, serialize_audit_event
 
 logger = logging.getLogger(__name__)
+
+
+def _ai_post_with_retry(url, headers, payload, timeout=60, max_retries=3):
+    """POST to AI provider with exponential backoff on 429 rate-limit errors."""
+    for attempt in range(max_retries):
+        resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+        if resp.status_code != 429 or attempt == max_retries - 1:
+            return resp
+        wait = 2 ** attempt  # 1s, 2s, 4s
+        logger.warning(f"AI provider rate-limited (429), retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
+        time.sleep(wait)
+    return resp  # unreachable, but keeps linters happy
 
 # Create your views here.
 
@@ -228,8 +241,8 @@ User's problem: "{user_prompt}"
             }
             api_url = api_url_template
 
-        # --- Make API Call ---
-        response = requests.post(api_url, json=payload, headers=headers)
+        # --- Make API Call (with retry on 429) ---
+        response = _ai_post_with_retry(api_url, headers, payload)
         if not response.ok:
             provider_error = response.text
             try:
@@ -238,6 +251,8 @@ User's problem: "{user_prompt}"
             except Exception:
                 pass
             logger.error(f"AI API request failed ({response.status_code}): {provider_error}")
+            if response.status_code == 429:
+                return JsonResponse({'error': 'The AI service is temporarily busy. Please wait a moment and try again.'}, status=429)
             return JsonResponse({'error': f'AI provider error ({response.status_code}): {provider_error}'}, status=502)
 
         result = response.json()
@@ -688,9 +703,11 @@ def chat_message(request, case_id):
     payload = {'model': model, 'messages': messages_payload}
 
     try:
-        resp = requests.post(api_url, headers=headers, json=payload, timeout=60)
+        resp = _ai_post_with_retry(api_url, headers, payload, timeout=60)
 
         if not resp.ok:
+            if resp.status_code == 429:
+                return JsonResponse({'error': 'The AI service is temporarily busy. Please wait a moment and try again.'}, status=429)
             err_msg = resp.text[:300]
             try:
                 err_msg = resp.json().get('error', {}).get('message', err_msg)
