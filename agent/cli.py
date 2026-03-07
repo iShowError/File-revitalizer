@@ -49,7 +49,7 @@ def build_parser():
         prog='file-revitalizer-agent',
         description='Local recovery agent for File Revitalizer',
     )
-    parser.add_argument('--version', action='version', version='%(prog)s 0.2.0')
+    parser.add_argument('--version', action='version', version='%(prog)s 0.2.1')
     subparsers = parser.add_subparsers(dest='command', required=True)
 
     # ── list-devices ─────────────────────────────────────────────────────────
