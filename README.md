@@ -1,4 +1,4 @@
-# File Revitalizer v0.1.0
+# File Revitalizer v0.2.1
 
 > Deductive BTRFS data-recovery engine — web UI + local agent + grounded AI assistant.
 
@@ -52,10 +52,12 @@
 
 ---
 
-## Sprint v0.1.0 — Phase Map
+## Release History
+
+### v0.1.0 — Core Sprint (8 phases)
 
 | # | Branch | What it delivers |
-|---|--------|-----------------|
+|---|--------|------------------|
 | 1 | `feat/core-models` | RecoveryCase FSM, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent |
 | 2 | `feat/recovery-api` | REST CRUD + state-machine transition endpoints |
 | 3 | `feat/local-agent` | `agent/cli.py` — health / scan / upload / execute |
@@ -64,6 +66,17 @@
 | 6 | `feat/one-file-recovery` | `dd` / `btrfs restore` command generator + result page |
 | 7 | `feat/chatbot-grounded` | Grounded AI chat — live case context injected into system prompt |
 | 8 | `feat/safety-and-tests` | Command whitelist guard + 39-test integration suite |
+
+### v0.2.0 — Agent Packaging
+
+- PyInstaller spec for single-binary Linux agent
+- GitHub Actions workflow — builds on `v*` tags, publishes to Releases with SHA256 checksum
+
+### v0.2.1 — Security Hardening
+
+- `execute.py` — removed `shell=True`, shell metacharacter rejection, removed `rm`/`truncate` from whitelist
+- `scan.py` — device path validation, `btrfs-find-root` stderr handling
+- Dead reference cleanup (stale `.pyc` removal)
 
 ---
 
