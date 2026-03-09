@@ -28,6 +28,11 @@ urlpatterns = [
     path('api/cases/<int:case_id>/recovery-result/', views.recovery_result_api, name='api_recovery_result'),
 
     # -----------------------------------------------------------------------
+    # Agent health endpoint
+    # -----------------------------------------------------------------------
+    path('api/agent/health/', views.agent_health, name='api_agent_health'),
+
+    # -----------------------------------------------------------------------
     # Phase 5 — Candidate table
     # -----------------------------------------------------------------------
     path('api/cases/<int:case_id>/generate-candidates/', views.generate_candidates, name='api_generate_candidates'),

@@ -836,3 +836,25 @@ def recovery_result_api(request, case_id):
         'status': 'recorded',
         'candidate_status': candidate.status,
     }, status=200)
+
+
+# ---------------------------------------------------------------------------
+# Agent health endpoint
+# ---------------------------------------------------------------------------
+@csrf_exempt
+def agent_health(request):
+    """GET /api/agent/health/ — lightweight ping for the agent.
+    Requires token auth (middleware sets request.user).
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    return JsonResponse({
+        'status': 'ok',
+        'server_version': '0.2.1',
+        'user': request.user.username,
+        'timestamp': timezone.now().isoformat(),
+    })
