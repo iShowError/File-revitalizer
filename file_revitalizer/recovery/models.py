@@ -20,6 +20,7 @@ class RecoveryCase(models.Model):
     STATE_SCANNING = 'SCANNING'
     STATE_ANALYZED = 'ANALYZED'
     STATE_RECOVERING = 'RECOVERING'
+    STATE_VERIFYING = 'VERIFYING'
     STATE_COMPLETE = 'COMPLETE'
     STATE_FAILED = 'FAILED'
 
@@ -28,6 +29,7 @@ class RecoveryCase(models.Model):
         (STATE_SCANNING,   'Scanning'),
         (STATE_ANALYZED,   'Analyzed'),
         (STATE_RECOVERING, 'Recovering'),
+        (STATE_VERIFYING,  'Verifying'),
         (STATE_COMPLETE,   'Complete'),
         (STATE_FAILED,     'Failed'),
     ]
@@ -37,7 +39,8 @@ class RecoveryCase(models.Model):
         STATE_CREATED:    [STATE_SCANNING,   STATE_FAILED],
         STATE_SCANNING:   [STATE_ANALYZED,   STATE_FAILED],
         STATE_ANALYZED:   [STATE_RECOVERING, STATE_FAILED],
-        STATE_RECOVERING: [STATE_COMPLETE,   STATE_FAILED],
+        STATE_RECOVERING: [STATE_VERIFYING,  STATE_FAILED],
+        STATE_VERIFYING:  [STATE_COMPLETE,   STATE_FAILED],
         STATE_COMPLETE:   [],
         STATE_FAILED:     [],
     }

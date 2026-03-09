@@ -87,6 +87,7 @@ class StateMachineTests(TestCase):
             RecoveryCase.STATE_SCANNING,
             RecoveryCase.STATE_ANALYZED,
             RecoveryCase.STATE_RECOVERING,
+            RecoveryCase.STATE_VERIFYING,
             RecoveryCase.STATE_COMPLETE,
         ]
         for target in valid_path:
