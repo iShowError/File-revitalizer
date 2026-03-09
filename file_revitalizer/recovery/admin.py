@@ -64,6 +64,9 @@ class AuditEventAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False  # Immutable
 
+    def has_delete_permission(self, request, obj=None):
+        return False  # Audit log is immutable
+
 
 @admin.register(AgentToken)
 class AgentTokenAdmin(admin.ModelAdmin):

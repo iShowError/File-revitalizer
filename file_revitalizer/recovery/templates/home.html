@@ -257,6 +257,7 @@
                     <p class="mt-4 text-lg text-blue-200 max-w-2xl mx-auto" data-animation="fade-in">Describe your data loss problem and get an instant expert analysis.</p>
                 </div>
                 <div class="max-w-3xl mx-auto">
+                    {% if user.is_authenticated %}
                     <div class="gemini-card p-8 rounded-2xl shadow-2xl" data-animation="fade-in">
                         <textarea id="ai-prompt" class="w-full h-32 p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white/50" placeholder="e.g., 'I accidentally formatted my external hard drive, it was an XFS partition...'"></textarea>
                         <button id="ai-submit" class="magnetic-button mt-4 w-full bg-slate-800 text-white font-semibold py-3 rounded-full hover:bg-slate-900 transition-all duration-300 shadow-lg flex items-center justify-center">
@@ -266,6 +267,12 @@
                             </span>
                         </button>
                     </div>
+                    {% else %}
+                    <div class="gemini-card p-8 rounded-2xl shadow-2xl text-center" data-animation="fade-in">
+                        <p class="text-slate-700 text-lg mb-4">Sign in to use AI-powered diagnosis.</p>
+                        <a href="{% url 'login' %}" class="magnetic-button inline-block bg-slate-800 text-white font-semibold px-8 py-3 rounded-full hover:bg-slate-900 transition-all duration-300 shadow-lg">Sign In</a>
+                    </div>
+                    {% endif %}
                     <div id="ai-result" class="mt-6 gemini-card p-8 rounded-2xl shadow-2xl hidden" data-animation="fade-in">
                         <div id="ai-loader" class="text-center hidden">
                             <div class="loader mx-auto"></div>

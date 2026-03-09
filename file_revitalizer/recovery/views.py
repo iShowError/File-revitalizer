@@ -182,6 +182,7 @@ def logout_view(request):
     return redirect('home')
 
 
+@login_required
 @csrf_exempt
 def diagnose_issue(request):
     """Handle AI-based data loss diagnosis using a configurable provider."""
@@ -362,6 +363,7 @@ def case_transition(request, case_id):
     if not new_state:
         return JsonResponse({'error': '"state" is required.'}, status=400)
 
+    old_state = case.state
     try:
         case.transition_to(new_state)
     except ValueError as e:
@@ -369,7 +371,7 @@ def case_transition(request, case_id):
 
     _audit(case, request.user, AuditEvent.EVENT_STATE_TRANSITION,
            f'Case #{case.pk} transitioned to {new_state}',
-           {'previous_state': case.state, 'new_state': new_state})
+           {'previous_state': old_state, 'new_state': new_state})
     return JsonResponse({'case': serialize_case(case)})
 
 
