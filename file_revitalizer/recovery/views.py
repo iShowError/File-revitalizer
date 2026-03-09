@@ -24,6 +24,7 @@ from .models import (
     RecoveryCase, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent,
     Agent, AgentToken,
 )
+from .report import generate_report
 from .serializers import serialize_case, serialize_artifact, serialize_candidate, serialize_audit_event
 
 logger = logging.getLogger(__name__)
@@ -1000,4 +1001,31 @@ def verify_candidate(request, case_id, candidate_id):
         'status': 'verified' if size_match else 'failed',
         'candidate_status': candidate.status,
         'size_match': size_match,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Recovery report
+# ---------------------------------------------------------------------------
+
+@csrf_exempt
+@login_required
+def case_report_api(request, case_id):
+    """GET /api/cases/<id>/report/ — JSON recovery report."""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET only'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    report = generate_report(case)
+    return JsonResponse(report)
+
+
+@login_required
+def case_report_view(request, case_id):
+    """Browser page: printable HTML report for a case."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    report = generate_report(case)
+    return render(request, 'recovery/report.html', {
+        'case': case,
+        'report': report,
     })
