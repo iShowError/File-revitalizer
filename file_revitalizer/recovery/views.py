@@ -933,3 +933,71 @@ def agent_heartbeat(request):
         'status': 'ok',
         'server_time': now.isoformat(),
     })
+
+
+# ---------------------------------------------------------------------------
+# Post-recovery verification
+# ---------------------------------------------------------------------------
+@login_required
+@csrf_exempt
+def verify_candidate(request, case_id, candidate_id):
+    """POST /api/cases/<id>/verify/<candidate_id>/
+
+    Called by the agent after recovery to verify the output file.
+    Body: { "file_exists": bool, "file_size": int, "sha256": "..." }
+    Compares against CandidateFile metadata and updates status.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    candidate = get_object_or_404(CandidateFile, pk=candidate_id, case=case)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    file_exists = data.get('file_exists', False)
+    actual_size = data.get('file_size', 0)
+    actual_hash = data.get('sha256', '')
+
+    if not file_exists:
+        candidate.status = CandidateFile.STATUS_FAILED
+        candidate.save(update_fields=['status'])
+        _audit(case, request.user, AuditEvent.EVENT_RECOVERY_RESULT,
+               f'Verification failed for {candidate.file_name}: file does not exist',
+               {'candidate_id': candidate.pk, 'file_exists': False})
+        return JsonResponse({'status': 'failed', 'reason': 'file does not exist'})
+
+    # Compare file size
+    size_match = (actual_size == candidate.file_size) if candidate.file_size else True
+
+    if size_match:
+        candidate.status = CandidateFile.STATUS_RECOVERED
+        candidate.recovered_at = timezone.now()
+    else:
+        candidate.status = CandidateFile.STATUS_FAILED
+    candidate.save(update_fields=['status', 'recovered_at'])
+
+    _audit(case, request.user, AuditEvent.EVENT_RECOVERY_RESULT,
+           f'Verification {"passed" if size_match else "failed"} for {candidate.file_name}',
+           {
+               'candidate_id': candidate.pk,
+               'file_exists': True,
+               'expected_size': candidate.file_size,
+               'actual_size': actual_size,
+               'size_match': size_match,
+               'sha256': actual_hash[:64],
+           })
+
+    # Auto-transition case to COMPLETE if all non-skipped candidates are verified
+    pending = case.candidates.filter(status=CandidateFile.STATUS_PENDING).count()
+    if pending == 0 and case.can_transition_to(RecoveryCase.STATE_COMPLETE):
+        case.transition_to(RecoveryCase.STATE_COMPLETE)
+
+    return JsonResponse({
+        'status': 'verified' if size_match else 'failed',
+        'candidate_status': candidate.status,
+        'size_match': size_match,
+    })

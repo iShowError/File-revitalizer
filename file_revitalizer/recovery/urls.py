@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/cases/<int:case_id>/recover/<int:candidate_id>/', views.recover_file, name='api_recover_file'),
     path('api/cases/<int:case_id>/audit/', views.audit_log, name='api_audit_log'),
     path('api/cases/<int:case_id>/recovery-result/', views.recovery_result_api, name='api_recovery_result'),
+    path('api/cases/<int:case_id>/verify/<int:candidate_id>/', views.verify_candidate, name='api_verify_candidate'),
 
     # -----------------------------------------------------------------------
     # Agent health endpoint
