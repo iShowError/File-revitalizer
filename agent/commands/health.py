@@ -1,12 +1,15 @@
 """health command — ping the web server and report local BTRFS tool availability."""
 import platform
 import shutil
+import socket
 import sys
 
 try:
     import requests
 except ImportError:
     sys.exit('requests is not installed. Run: pip install -r requirements.txt')
+
+AGENT_VERSION = '0.2.1'
 
 
 # BTRFS tools we check for
@@ -76,7 +79,11 @@ def run(server: str, token: str) -> bool:
           f'({platform.machine()})')
     print(f'[health] Python: {platform.python_version()}')
 
-    # 4. Summary
+    # 4. Register / heartbeat with server
+    if server_ok:
+        _register_agent(server, token)
+
+    # 5. Summary
     overall = server_ok and all_required_ok
     status = 'PASS' if overall else 'FAIL'
     print(f'\n[health] Result: {status}')
@@ -84,3 +91,29 @@ def run(server: str, token: str) -> bool:
         print('  ⚠ Install missing required tools before running `scan`.')
         print('    On Debian/Ubuntu: sudo apt install btrfs-progs')
     return overall
+
+
+def _register_agent(server: str, token: str):
+    """Register this machine with the server (or update heartbeat)."""
+    base = server.rstrip('/')
+    headers = {'Authorization': f'Token {token}'}
+    payload = {
+        'machine_name': socket.gethostname(),
+        'os_info': f'{platform.system()} {platform.release()} ({platform.machine()})',
+        'agent_version': AGENT_VERSION,
+    }
+    try:
+        resp = requests.post(
+            f'{base}/api/agent/register/',
+            json=payload,
+            headers=headers,
+            timeout=10,
+        )
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            action = data.get('status', 'registered')
+            print(f'\n[health] Agent {action} (id={data.get("agent_id", "?")})')
+        else:
+            print(f'\n[health] Registration returned HTTP {resp.status_code}')
+    except requests.exceptions.RequestException as e:
+        print(f'\n[health] Could not register agent: {e}')
