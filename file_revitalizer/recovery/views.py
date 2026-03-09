@@ -182,6 +182,7 @@ def logout_view(request):
     return redirect('home')
 
 
+@login_required
 @csrf_exempt
 def diagnose_issue(request):
     """Handle AI-based data loss diagnosis using a configurable provider."""
