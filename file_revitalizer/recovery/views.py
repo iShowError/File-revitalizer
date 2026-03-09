@@ -766,3 +766,73 @@ def case_detail_html(request, case_id):
         'audit_events': audit_events,
         'candidate_count': case.candidates.count(),
     })
+
+
+# ---------------------------------------------------------------------------
+# Agent API — Recovery result reporting
+# ---------------------------------------------------------------------------
+
+@login_required
+@csrf_exempt
+def recovery_result_api(request, case_id):
+    """POST /api/cases/<id>/recovery-result/
+
+    Called by the local agent after executing recovery commands.
+    Body: {
+        "candidate_id": int,
+        "results": [{"command": str, "returncode": int, "stdout": str,
+                     "stderr": str, "blocked": bool}, ...],
+        "all_ok": bool
+    }
+    Updates the CandidateFile status and logs an AuditEvent.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    candidate_id = data.get('candidate_id')
+    results = data.get('results', [])
+    all_ok = data.get('all_ok', False)
+
+    if candidate_id is None:
+        return JsonResponse({'error': '"candidate_id" is required.'}, status=400)
+
+    candidate = get_object_or_404(
+        CandidateFile, pk=candidate_id, case=case,
+    )
+
+    if all_ok:
+        candidate.status = CandidateFile.STATUS_RECOVERED
+        candidate.recovered_at = timezone.now()
+    else:
+        candidate.status = CandidateFile.STATUS_FAILED
+    candidate.save(update_fields=['status', 'recovered_at'])
+
+    _audit(
+        case, request.user, AuditEvent.EVENT_RECOVERY_RESULT,
+        f'Recovery {"succeeded" if all_ok else "failed"} for candidate #{candidate_id}',
+        {
+            'candidate_id': candidate_id,
+            'all_ok': all_ok,
+            'command_count': len(results),
+            'results_summary': [
+                {
+                    'command': r.get('command', '')[:200],
+                    'returncode': r.get('returncode'),
+                    'blocked': r.get('blocked', False),
+                }
+                for r in results[:20]
+            ],
+        },
+    )
+
+    return JsonResponse({
+        'status': 'recorded',
+        'candidate_status': candidate.status,
+    }, status=200)
