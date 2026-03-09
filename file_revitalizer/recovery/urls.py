@@ -31,6 +31,8 @@ urlpatterns = [
     # Agent health endpoint
     # -----------------------------------------------------------------------
     path('api/agent/health/', views.agent_health, name='api_agent_health'),
+    path('api/agent/register/', views.agent_register, name='api_agent_register'),
+    path('api/agent/heartbeat/', views.agent_heartbeat, name='api_agent_heartbeat'),
 
     # -----------------------------------------------------------------------
     # Phase 5 — Candidate table

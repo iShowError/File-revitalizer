@@ -22,6 +22,7 @@ import time
 import requests
 from .models import (
     RecoveryCase, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent,
+    Agent, AgentToken,
 )
 from .serializers import serialize_case, serialize_artifact, serialize_candidate, serialize_audit_event
 
@@ -859,4 +860,76 @@ def agent_health(request):
         'server_version': '0.2.1',
         'user': request.user.username,
         'timestamp': timezone.now().isoformat(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Agent registration & heartbeat
+# ---------------------------------------------------------------------------
+@csrf_exempt
+def agent_register(request):
+    """POST /api/agent/register/ — register or update an agent machine.
+    Requires token auth.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    machine_name = data.get('machine_name', '').strip()
+    if not machine_name:
+        return JsonResponse({'error': '"machine_name" is required.'}, status=400)
+
+    # Resolve the AgentToken used for this request (set by middleware)
+    token_obj = None
+    if getattr(request, 'is_token_auth', False):
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            key = auth_header[6:].strip()
+            token_obj = AgentToken.objects.filter(key=key).first()
+
+    agent, created = Agent.objects.update_or_create(
+        user=request.user,
+        machine_name=machine_name,
+        defaults={
+            'token': token_obj,
+            'os_info': data.get('os_info', '')[:255],
+            'agent_version': data.get('agent_version', '')[:20],
+            'last_heartbeat': timezone.now(),
+            'is_active': True,
+        },
+    )
+
+    return JsonResponse({
+        'agent_id': agent.pk,
+        'status': 'registered' if created else 'updated',
+    }, status=201 if created else 200)
+
+
+@csrf_exempt
+def agent_heartbeat(request):
+    """POST /api/agent/heartbeat/ — update the agent's last_heartbeat.
+    Requires token auth.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    now = timezone.now()
+    updated = Agent.objects.filter(
+        user=request.user, is_active=True,
+    ).update(last_heartbeat=now)
+
+    if not updated:
+        return JsonResponse({'error': 'No registered agent found.'}, status=404)
+
+    return JsonResponse({
+        'status': 'ok',
+        'server_time': now.isoformat(),
     })
