@@ -543,3 +543,67 @@ class TokenAuthTests(TestCase):
             HTTP_AUTHORIZATION='Token ',
         )
         self.assertEqual(resp.status_code, 401)
+
+
+# ---------------------------------------------------------------------------
+# 7. Phase B Bug Fixes
+# ---------------------------------------------------------------------------
+
+class PhaseBBugFixTests(TestCase):
+    """Tests for Phase B bug fixes (B1–B3)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='bugfixuser', password='pass')
+        self.client = Client()
+        self.client.login(username='bugfixuser', password='pass')
+
+    # B1: Audit log records correct previous state
+    def test_transition_audit_records_correct_previous_state(self):
+        case = RecoveryCase.objects.create(
+            user=self.user, title='AuditStateTest', device_path='/dev/sdb',
+        )
+        self.assertEqual(case.state, RecoveryCase.STATE_CREATED)
+
+        self.client.post(
+            f'/api/cases/{case.pk}/transition/',
+            data=json.dumps({'state': RecoveryCase.STATE_SCANNING}),
+            content_type='application/json',
+        )
+        event = AuditEvent.objects.filter(case=case, event_type=AuditEvent.EVENT_STATE_TRANSITION).first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.detail['previous_state'], RecoveryCase.STATE_CREATED)
+        self.assertEqual(event.detail['new_state'], RecoveryCase.STATE_SCANNING)
+
+    # B2: diagnose_issue requires authentication
+    def test_diagnose_anon_redirects_to_login(self):
+        anon = Client()
+        resp = anon.post(
+            '/api/diagnose/',
+            data=json.dumps({'prompt': 'test'}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp.url)
+
+    def test_diagnose_authenticated_not_redirected(self):
+        resp = self.client.post(
+            '/api/diagnose/',
+            data=json.dumps({'prompt': 'test'}),
+            content_type='application/json',
+        )
+        # Should not be a redirect — may be 500 (no API key) or 200, but never 302
+        self.assertNotEqual(resp.status_code, 302)
+
+    # B3: AuditEvent admin is fully immutable
+    def test_audit_admin_blocks_delete(self):
+        from .admin import AuditEventAdmin
+        from django.contrib.admin import site
+        admin_instance = AuditEventAdmin(AuditEvent, site)
+        self.assertFalse(admin_instance.has_delete_permission(request=None))
+
+    def test_audit_admin_blocks_add_and_change(self):
+        from .admin import AuditEventAdmin
+        from django.contrib.admin import site
+        admin_instance = AuditEventAdmin(AuditEvent, site)
+        self.assertFalse(admin_instance.has_add_permission(request=None))
+        self.assertFalse(admin_instance.has_change_permission(request=None))
