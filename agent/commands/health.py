@@ -25,17 +25,25 @@ def run(server: str, token: str) -> bool:
     """Execute health check. Returns True on success."""
     print(f'\n[health] Checking connectivity to {server} ...')
 
-    # 1. Ping web server
+    # 1. Ping dedicated health endpoint
     try:
         resp = requests.get(
-            f'{server.rstrip("/")}/api/cases/',
+            f'{server.rstrip("/")}/api/agent/health/',
             headers={'Authorization': f'Token {token}'},
             timeout=10,
         )
-        if resp.status_code in (200, 403, 401):
-            # 200 = authenticated OK, 403/401 = server reachable but token wrong
-            print(f'  [✓] Server reachable (HTTP {resp.status_code})')
-            server_ok = True
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('status') == 'ok':
+                print(f'  [✓] Server reachable — version {data.get("server_version", "?")}, '
+                      f'authenticated as {data.get("user", "?")}')
+                server_ok = True
+            else:
+                print(f'  [✗] Server returned unexpected payload: {data}')
+                server_ok = False
+        elif resp.status_code == 401:
+            print(f'  [✗] Server reachable but token is invalid/inactive (HTTP 401)')
+            server_ok = False
         else:
             print(f'  [✗] Server returned unexpected status {resp.status_code}')
             server_ok = False

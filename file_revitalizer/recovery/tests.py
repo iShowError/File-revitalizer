@@ -17,7 +17,7 @@ from django.test import TestCase, Client
 
 from .models import (
     RecoveryCase, Artifact, CandidateFile,
-    ChatSession, ChatMessage, AuditEvent,
+    ChatSession, ChatMessage, AuditEvent, AgentToken,
 )
 from .command_generator import (
     generate_dd_command, generate_btrfs_restore_command,
@@ -469,3 +469,77 @@ class AuditEventImmutabilityTests(TestCase):
         from .admin import AuditEventAdmin
         from django.contrib.admin import site
         admin_instance = AuditEventAdmin(AuditEvent, site)
+
+
+# ---------------------------------------------------------------------------
+# 6. Token Authentication
+# ---------------------------------------------------------------------------
+
+class TokenAuthTests(TestCase):
+    """Tests for AgentToken model and TokenAuthMiddleware."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='tokenuser', password='pass')
+        self.token = AgentToken.objects.create(user=self.user, label='test')
+        self.client = Client()
+
+    def test_valid_token_authenticates(self):
+        """A valid token should authenticate and return JSON, not a redirect."""
+        resp = self.client.get(
+            '/api/cases/',
+            HTTP_AUTHORIZATION=f'Token {self.token.key}',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'application/json')
+
+    def test_invalid_token_returns_401(self):
+        """A bogus token should get 401 JSON, not a 302 redirect."""
+        resp = self.client.get(
+            '/api/cases/',
+            HTTP_AUTHORIZATION='Token 0000000000000000000000000000000000000000',
+        )
+        self.assertEqual(resp.status_code, 401)
+        data = json.loads(resp.content)
+        self.assertIn('error', data)
+
+    def test_inactive_token_rejected(self):
+        """A deactivated token should get 401."""
+        self.token.is_active = False
+        self.token.save()
+        resp = self.client.get(
+            '/api/cases/',
+            HTTP_AUTHORIZATION=f'Token {self.token.key}',
+        )
+        self.assertEqual(resp.status_code, 401)
+
+    def test_missing_token_falls_through_to_session(self):
+        """No token header → normal session auth (302 to login for anon)."""
+        resp = self.client.get('/api/cases/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp.url)
+
+    def test_last_used_updated(self):
+        """After a successful token auth, last_used_at should be set."""
+        self.assertIsNone(self.token.last_used_at)
+        self.client.get(
+            '/api/cases/',
+            HTTP_AUTHORIZATION=f'Token {self.token.key}',
+        )
+        self.token.refresh_from_db()
+        self.assertIsNotNone(self.token.last_used_at)
+
+    def test_token_key_auto_generated(self):
+        """Token key should be auto-generated as 40-char hex."""
+        t = AgentToken(user=self.user)
+        t.save()
+        self.assertEqual(len(t.key), 40)
+        # Verify it's valid hex
+        int(t.key, 16)
+
+    def test_empty_token_after_prefix_returns_401(self):
+        """'Authorization: Token ' with nothing after it should return 401."""
+        resp = self.client.get(
+            '/api/cases/',
+            HTTP_AUTHORIZATION='Token ',
+        )
+        self.assertEqual(resp.status_code, 401)

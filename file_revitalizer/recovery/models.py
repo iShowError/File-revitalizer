@@ -1,3 +1,5 @@
+import secrets
+
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -255,3 +257,39 @@ class AuditEvent(models.Model):
 
     def __str__(self):
         return f'[{self.event_type}] {self.summary} @ {self.created_at}'
+
+
+class AgentToken(models.Model):
+    """API token for authenticating the local agent with the server.
+
+    Each token is a 40-character hex string tied to a single user.
+    A user can have multiple tokens (e.g. one per machine).
+    """
+
+    key = models.CharField(
+        max_length=40, unique=True, db_index=True,
+        help_text='40-char hex token (generated automatically)',
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='agent_tokens',
+    )
+    label = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text='Optional label (e.g. "home-server", "lab-machine")',
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'agent_tokens'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        masked = f'{self.key[:8]}…{self.key[-4:]}'
+        return f'Token {masked} ({self.user.username})'
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = secrets.token_hex(20)
+        super().save(*args, **kwargs)

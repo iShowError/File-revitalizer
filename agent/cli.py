@@ -50,7 +50,7 @@ def build_parser():
         description='Local recovery agent for File Revitalizer',
     )
     parser.add_argument('--version', action='version', version='%(prog)s 0.2.1')
-    subparsers = parser.add_subparsers(dest='command', required=True)
+    subparsers = parser.add_subparsers(dest='subcommand', required=True)
 
     # ── list-devices ─────────────────────────────────────────────────────────
     subparsers.add_parser(
@@ -116,17 +116,17 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    if args.command == 'list-devices':
+    if args.subcommand == 'list-devices':
         from commands.list_devices import run as run_list_devices
         success = run_list_devices()
         sys.exit(0 if success else 1)
 
-    elif args.command == 'health':
+    elif args.subcommand == 'health':
         from commands.health import run as run_health
         success = run_health(args.server, args.token)
         sys.exit(0 if success else 1)
 
-    elif args.command == 'scan':
+    elif args.subcommand == 'scan':
         from commands.scan import run as run_scan
         success = run_scan(
             server=args.server,
@@ -137,7 +137,7 @@ def main():
         )
         sys.exit(0 if success else 1)
 
-    elif args.command == 'upload':
+    elif args.subcommand == 'upload':
         from commands.upload import run as run_upload
         success = run_upload(
             server=args.server,
@@ -145,11 +145,11 @@ def main():
             file_path=args.file,
             artifact_type=args.artifact_type,
             case_id=args.case_id,
-            source_command=args.command if hasattr(args, 'command') else '',
+            source_command=args.command,
         )
         sys.exit(0 if success else 1)
 
-    elif args.command == 'execute':
+    elif args.subcommand == 'execute':
         import json as _json
         from commands.execute import run as run_execute
         try:

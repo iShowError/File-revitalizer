@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
     RecoveryCase, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent,
+    AgentToken,
 )
 
 
@@ -62,3 +63,16 @@ class AuditEventAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False  # Immutable
+
+
+@admin.register(AgentToken)
+class AgentTokenAdmin(admin.ModelAdmin):
+    list_display = ('id', 'masked_key', 'user', 'label', 'is_active', 'created_at', 'last_used_at')
+    list_filter = ('is_active',)
+    search_fields = ('user__username', 'label')
+    readonly_fields = ('key', 'created_at', 'last_used_at')
+    ordering = ('-created_at',)
+
+    def masked_key(self, obj):
+        return f'{obj.key[:8]}…{obj.key[-4:]}'
+    masked_key.short_description = 'Token'
