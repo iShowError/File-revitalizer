@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     RecoveryCase, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent,
-    AgentToken,
+    AgentToken, Agent,
 )
 
 
@@ -79,3 +79,12 @@ class AgentTokenAdmin(admin.ModelAdmin):
     def masked_key(self, obj):
         return f'{obj.key[:8]}…{obj.key[-4:]}'
     masked_key.short_description = 'Token'
+
+
+@admin.register(Agent)
+class AgentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'machine_name', 'user', 'agent_version', 'is_active', 'last_heartbeat', 'registered_at')
+    list_filter = ('is_active',)
+    search_fields = ('machine_name', 'user__username')
+    readonly_fields = ('registered_at', 'last_heartbeat')
+    ordering = ('-registered_at',)

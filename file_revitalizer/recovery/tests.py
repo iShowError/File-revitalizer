@@ -17,7 +17,7 @@ from django.test import TestCase, Client
 
 from .models import (
     RecoveryCase, Artifact, CandidateFile,
-    ChatSession, ChatMessage, AuditEvent, AgentToken,
+    ChatSession, ChatMessage, AuditEvent, AgentToken, Agent,
 )
 from .command_generator import (
     generate_dd_command, generate_btrfs_restore_command,
@@ -87,6 +87,7 @@ class StateMachineTests(TestCase):
             RecoveryCase.STATE_SCANNING,
             RecoveryCase.STATE_ANALYZED,
             RecoveryCase.STATE_RECOVERING,
+            RecoveryCase.STATE_VERIFYING,
             RecoveryCase.STATE_COMPLETE,
         ]
         for target in valid_path:
@@ -607,3 +608,190 @@ class PhaseBBugFixTests(TestCase):
         admin_instance = AuditEventAdmin(AuditEvent, site)
         self.assertFalse(admin_instance.has_add_permission(request=None))
         self.assertFalse(admin_instance.has_change_permission(request=None))
+
+
+# ---------------------------------------------------------------------------
+# 8. Phase C — Missing Features Tests
+# ---------------------------------------------------------------------------
+
+class PhaseCTests(TestCase):
+    """Tests for Phase C: agent registration, heartbeat, VERIFYING state,
+    verification endpoint, and recovery report."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='pcuser', password='pass')
+        self.token = AgentToken.objects.create(user=self.user)
+        self.auth = f'Token {self.token.key}'
+        self.client = Client()
+
+    def _make_case_at_state(self, state):
+        """Helper: create a case and walk it to the given state."""
+        case = RecoveryCase.objects.create(
+            user=self.user, title='PC Test', device_path='/dev/sdb',
+        )
+        path = {
+            RecoveryCase.STATE_SCANNING: [RecoveryCase.STATE_SCANNING],
+            RecoveryCase.STATE_ANALYZED: [RecoveryCase.STATE_SCANNING, RecoveryCase.STATE_ANALYZED],
+            RecoveryCase.STATE_RECOVERING: [
+                RecoveryCase.STATE_SCANNING, RecoveryCase.STATE_ANALYZED,
+                RecoveryCase.STATE_RECOVERING,
+            ],
+            RecoveryCase.STATE_VERIFYING: [
+                RecoveryCase.STATE_SCANNING, RecoveryCase.STATE_ANALYZED,
+                RecoveryCase.STATE_RECOVERING, RecoveryCase.STATE_VERIFYING,
+            ],
+        }
+        for s in path.get(state, []):
+            case.transition_to(s)
+        return case
+
+    # -- Agent registration --
+
+    def test_agent_register(self):
+        resp = self.client.post(
+            '/api/agent/register/',
+            data=json.dumps({
+                'machine_name': 'test-box',
+                'os_info': 'Linux 6.1',
+                'agent_version': '0.2.1',
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertIn(resp.status_code, [200, 201])
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'registered')
+        self.assertTrue(Agent.objects.filter(user=self.user, machine_name='test-box').exists())
+
+    def test_agent_register_unauthenticated(self):
+        resp = self.client.post(
+            '/api/agent/register/',
+            data=json.dumps({'machine_name': 'x', 'os_info': 'x', 'agent_version': 'x'}),
+            content_type='application/json',
+        )
+        self.assertIn(resp.status_code, [302, 401])
+
+    # -- Agent heartbeat --
+
+    def test_agent_heartbeat(self):
+        Agent.objects.create(user=self.user, machine_name='hb-box')
+        resp = self.client.post(
+            '/api/agent/heartbeat/',
+            data=json.dumps({'machine_name': 'hb-box'}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'ok')
+
+    def test_heartbeat_unknown_agent_returns_404(self):
+        resp = self.client.post(
+            '/api/agent/heartbeat/',
+            data=json.dumps({'machine_name': 'no-such-box'}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    # -- VERIFYING state --
+
+    def test_verifying_state_reachable(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_RECOVERING)
+        self.assertTrue(case.can_transition_to(RecoveryCase.STATE_VERIFYING))
+        case.transition_to(RecoveryCase.STATE_VERIFYING)
+        self.assertEqual(case.state, RecoveryCase.STATE_VERIFYING)
+
+    def test_verifying_to_complete(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_VERIFYING)
+        self.assertTrue(case.can_transition_to(RecoveryCase.STATE_COMPLETE))
+        case.transition_to(RecoveryCase.STATE_COMPLETE)
+        self.assertEqual(case.state, RecoveryCase.STATE_COMPLETE)
+
+    # -- Verification endpoint --
+
+    def test_verify_candidate_size_match(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_VERIFYING)
+        cand = CandidateFile.objects.create(
+            case=case, inode_number=100, file_name='test.bin',
+            file_size=4096, status=CandidateFile.STATUS_PENDING,
+        )
+        resp = self.client.post(
+            f'/api/cases/{case.pk}/verify/{cand.pk}/',
+            data=json.dumps({'file_exists': True, 'file_size': 4096, 'sha256': 'abc'}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'verified')
+        self.assertTrue(data['size_match'])
+        cand.refresh_from_db()
+        self.assertEqual(cand.status, CandidateFile.STATUS_RECOVERED)
+
+    def test_verify_candidate_file_missing(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_VERIFYING)
+        cand = CandidateFile.objects.create(
+            case=case, inode_number=200, file_name='gone.bin',
+            file_size=1024, status=CandidateFile.STATUS_PENDING,
+        )
+        resp = self.client.post(
+            f'/api/cases/{case.pk}/verify/{cand.pk}/',
+            data=json.dumps({'file_exists': False, 'file_size': 0, 'sha256': ''}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'failed')
+        cand.refresh_from_db()
+        self.assertEqual(cand.status, CandidateFile.STATUS_FAILED)
+
+    def test_verify_auto_transitions_case_to_complete(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_VERIFYING)
+        cand = CandidateFile.objects.create(
+            case=case, inode_number=300, file_name='only.bin',
+            file_size=512, status=CandidateFile.STATUS_PENDING,
+        )
+        self.client.post(
+            f'/api/cases/{case.pk}/verify/{cand.pk}/',
+            data=json.dumps({'file_exists': True, 'file_size': 512, 'sha256': ''}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        case.refresh_from_db()
+        self.assertEqual(case.state, RecoveryCase.STATE_COMPLETE)
+
+    # -- Report --
+
+    def test_report_api_returns_json(self):
+        self.client.login(username='pcuser', password='pass')
+        case = RecoveryCase.objects.create(
+            user=self.user, title='Report Test', device_path='/dev/sdb',
+        )
+        resp = self.client.get(f'/api/cases/{case.pk}/report/')
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertIn('case', data)
+        self.assertIn('timeline', data)
+        self.assertIn('candidates', data)
+        self.assertIn('artifacts', data)
+        self.assertEqual(data['case']['id'], case.pk)
+
+    def test_report_html_renders(self):
+        self.client.login(username='pcuser', password='pass')
+        case = RecoveryCase.objects.create(
+            user=self.user, title='HTML Report', device_path='/dev/sdb',
+        )
+        resp = self.client.get(f'/cases/{case.pk}/report/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Recovery Report')
+
+    def test_report_requires_auth(self):
+        anon = Client()
+        case = RecoveryCase.objects.create(
+            user=self.user, title='Auth Report', device_path='/dev/sdb',
+        )
+        resp = anon.get(f'/api/cases/{case.pk}/report/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp.url)

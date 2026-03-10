@@ -20,6 +20,7 @@ class RecoveryCase(models.Model):
     STATE_SCANNING = 'SCANNING'
     STATE_ANALYZED = 'ANALYZED'
     STATE_RECOVERING = 'RECOVERING'
+    STATE_VERIFYING = 'VERIFYING'
     STATE_COMPLETE = 'COMPLETE'
     STATE_FAILED = 'FAILED'
 
@@ -28,6 +29,7 @@ class RecoveryCase(models.Model):
         (STATE_SCANNING,   'Scanning'),
         (STATE_ANALYZED,   'Analyzed'),
         (STATE_RECOVERING, 'Recovering'),
+        (STATE_VERIFYING,  'Verifying'),
         (STATE_COMPLETE,   'Complete'),
         (STATE_FAILED,     'Failed'),
     ]
@@ -37,7 +39,8 @@ class RecoveryCase(models.Model):
         STATE_CREATED:    [STATE_SCANNING,   STATE_FAILED],
         STATE_SCANNING:   [STATE_ANALYZED,   STATE_FAILED],
         STATE_ANALYZED:   [STATE_RECOVERING, STATE_FAILED],
-        STATE_RECOVERING: [STATE_COMPLETE,   STATE_FAILED],
+        STATE_RECOVERING: [STATE_VERIFYING,  STATE_FAILED],
+        STATE_VERIFYING:  [STATE_COMPLETE,   STATE_FAILED],
         STATE_COMPLETE:   [],
         STATE_FAILED:     [],
     }
@@ -293,3 +296,31 @@ class AgentToken(models.Model):
         if not self.key:
             self.key = secrets.token_hex(20)
         super().save(*args, **kwargs)
+
+
+class Agent(models.Model):
+    """Registered agent machine linked to a user and token.
+
+    Tracks which machines have connected, their OS/version info,
+    and when they last sent a heartbeat.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='agents')
+    token = models.ForeignKey(
+        AgentToken, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='agents',
+    )
+    machine_name = models.CharField(max_length=255)
+    os_info = models.CharField(max_length=255, blank=True, default='')
+    agent_version = models.CharField(max_length=20, blank=True, default='')
+    last_heartbeat = models.DateTimeField(null=True, blank=True)
+    registered_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'agents'
+        ordering = ['-registered_at']
+        unique_together = [['user', 'machine_name']]
+
+    def __str__(self):
+        return f'Agent {self.machine_name} ({self.user.username})'

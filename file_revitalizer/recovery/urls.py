@@ -26,11 +26,15 @@ urlpatterns = [
     path('api/cases/<int:case_id>/recover/<int:candidate_id>/', views.recover_file, name='api_recover_file'),
     path('api/cases/<int:case_id>/audit/', views.audit_log, name='api_audit_log'),
     path('api/cases/<int:case_id>/recovery-result/', views.recovery_result_api, name='api_recovery_result'),
+    path('api/cases/<int:case_id>/verify/<int:candidate_id>/', views.verify_candidate, name='api_verify_candidate'),
+    path('api/cases/<int:case_id>/report/', views.case_report_api, name='api_case_report'),
 
     # -----------------------------------------------------------------------
     # Agent health endpoint
     # -----------------------------------------------------------------------
     path('api/agent/health/', views.agent_health, name='api_agent_health'),
+    path('api/agent/register/', views.agent_register, name='api_agent_register'),
+    path('api/agent/heartbeat/', views.agent_heartbeat, name='api_agent_heartbeat'),
 
     # -----------------------------------------------------------------------
     # Phase 5 — Candidate table
@@ -55,4 +59,5 @@ urlpatterns = [
     # -----------------------------------------------------------------------
     path('cases/', views.cases_list_html, name='cases_list'),
     path('cases/<int:case_id>/', views.case_detail_html, name='case_detail'),
+    path('cases/<int:case_id>/report/', views.case_report_view, name='case_report_view'),
 ]

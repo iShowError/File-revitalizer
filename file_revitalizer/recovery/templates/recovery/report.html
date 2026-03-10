@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report — Case #{{ case.pk }} | File Revitalizer</title>
+    <style>
+        :root {
+            --bg: #0f1117; --surface: #1a1d27; --surface2: #23273a;
+            --border: #2e3347; --accent: #6c63ff; --accent2: #00d4aa;
+            --danger: #ff4757; --warning: #ffa502;
+            --text: #e8eaf0; --text-muted: #8890a4;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; gap: 1.5rem; height: 56px; }
+        nav a { color: var(--text-muted); text-decoration: none; font-size: .875rem; }
+        nav a:hover { color: var(--text); }
+        nav .brand { color: var(--accent); font-weight: 700; font-size: 1rem; margin-right: auto; }
+
+        .page { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.4rem; margin-bottom: .5rem; }
+        h2 { font-size: 1.1rem; margin: 1.5rem 0 .75rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
+        .meta { color: var(--text-muted); font-size: .8rem; }
+
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+        .kv { display: flex; gap: .75rem; margin-bottom: .35rem; }
+        .kv .label { color: var(--text-muted); min-width: 130px; font-size: .85rem; }
+        .kv .value { font-size: .85rem; }
+
+        table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        th, td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; }
+
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .75rem; font-weight: 600; }
+        .badge-recovered { background: rgba(0,212,170,.15); color: var(--accent2); }
+        .badge-failed    { background: rgba(255,71,87,.15);  color: var(--danger); }
+        .badge-pending   { background: rgba(255,165,2,.15);  color: var(--warning); }
+        .badge-skipped   { background: rgba(136,144,164,.15);color: var(--text-muted); }
+
+        .actions { display: flex; gap: .75rem; margin-bottom: 1.5rem; }
+        .btn { padding: .5rem 1rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; font-size: .85rem; text-decoration: none; }
+        .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        @media print {
+            body { background: #fff; color: #111; }
+            nav, .actions { display: none; }
+            .card { border-color: #ccc; }
+            th { color: #555; }
+            .page { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<nav>
+    <a class="brand" href="/">File Revitalizer</a>
+    <a href="{% url 'cases_list' %}">Cases</a>
+    <a href="{% url 'case_detail' case.pk %}">Case #{{ case.pk }}</a>
+    <a href="{% url 'dashboard' %}">Dashboard</a>
+</nav>
+
+<div class="page">
+    <h1>Recovery Report — {{ case.title }}</h1>
+    <p class="meta">Generated {{ report.generated_at }}</p>
+
+    <div class="actions">
+        <a class="btn" href="{% url 'api_case_report' case.pk %}">Download JSON</a>
+        <button class="btn" onclick="window.print()">Print</button>
+        <a class="btn" href="{% url 'case_detail' case.pk %}">Back to Case</a>
+    </div>
+
+    <!-- Case overview -->
+    <h2>Case Overview</h2>
+    <div class="card">
+        <div class="kv"><span class="label">Case ID</span><span class="value">#{{ report.case.id }}</span></div>
+        <div class="kv"><span class="label">Title</span><span class="value">{{ report.case.title }}</span></div>
+        <div class="kv"><span class="label">Device</span><span class="value">{{ report.case.device_path }}</span></div>
+        {% if report.case.filesystem_uuid %}
+        <div class="kv"><span class="label">UUID</span><span class="value">{{ report.case.filesystem_uuid }}</span></div>
+        {% endif %}
+        <div class="kv"><span class="label">State</span><span class="value">{{ report.case.state }}</span></div>
+        <div class="kv"><span class="label">Created</span><span class="value">{{ report.case.created_at }}</span></div>
+        <div class="kv"><span class="label">Last Updated</span><span class="value">{{ report.case.updated_at }}</span></div>
+        {% if report.case.notes %}
+        <div class="kv"><span class="label">Notes</span><span class="value">{{ report.case.notes }}</span></div>
+        {% endif %}
+    </div>
+
+    <!-- Candidates -->
+    <h2>Candidate Files ({{ report.candidates.total }})</h2>
+    <div class="card">
+        {% if report.candidates.items %}
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Size</th><th>Confidence</th><th>Status</th><th>Recovered</th></tr>
+            </thead>
+            <tbody>
+                {% for c in report.candidates.items %}
+                <tr>
+                    <td>{{ c.file_name|default:"unnamed" }}</td>
+                    <td>{{ c.file_size|filesizeformat }}</td>
+                    <td>{{ c.confidence|floatformat:2 }}</td>
+                    <td><span class="badge badge-{{ c.status }}">{{ c.status }}</span></td>
+                    <td>{{ c.recovered_at|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:var(--text-muted)">No candidates generated.</p>
+        {% endif %}
+    </div>
+
+    <!-- Artifacts -->
+    <h2>Artifacts ({{ report.artifacts.count }})</h2>
+    <div class="card">
+        {% if report.artifacts.items %}
+        <table>
+            <thead><tr><th>Type</th><th>Command</th><th>Parsed</th><th>Uploaded</th></tr></thead>
+            <tbody>
+                {% for a in report.artifacts.items %}
+                <tr>
+                    <td>{{ a.type }}</td>
+                    <td style="font-family:monospace;font-size:.8rem">{{ a.source_command|truncatechars:60 }}</td>
+                    <td>{% if a.parsed %}Yes{% else %}No{% endif %}</td>
+                    <td>{{ a.uploaded_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:var(--text-muted)">No artifacts collected.</p>
+        {% endif %}
+    </div>
+
+    <!-- Timeline -->
+    <h2>Timeline ({{ report.timeline|length }} events)</h2>
+    <div class="card">
+        {% if report.timeline %}
+        <table>
+            <thead><tr><th>Time</th><th>Event</th><th>Summary</th></tr></thead>
+            <tbody>
+                {% for e in report.timeline %}
+                <tr>
+                    <td style="white-space:nowrap">{{ e.timestamp }}</td>
+                    <td>{{ e.event_type }}</td>
+                    <td>{{ e.summary|truncatechars:120 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:var(--text-muted)">No audit events recorded.</p>
+        {% endif %}
+    </div>
+
+    <!-- Chat highlights -->
+    {% if report.chat_summary %}
+    <h2>Chat Highlights</h2>
+    <div class="card">
+        {% for msg in report.chat_summary %}
+        <div style="margin-bottom:.75rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)">
+            <p style="color:var(--text-muted);font-size:.75rem;margin-bottom:.25rem">{{ msg.timestamp }}</p>
+            <p style="font-size:.85rem">{{ msg.content }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>

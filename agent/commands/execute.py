@@ -10,13 +10,15 @@ This module:
 3. Executes each command sequentially (without shell=True).
 4. Returns stdout/stderr for each command.
 5. Refuses to run anything not in the whitelist.
+6. Verifies output file exists and reports size/hash to the server.
 """
+import hashlib
 import json
+import os
 import re
 import shlex
 import subprocess
 import sys
-import os
 
 try:
     import requests
@@ -152,4 +154,76 @@ def run(server: str, token: str, commands: list, candidate_id: int = None,
         except requests.exceptions.RequestException as e:
             print(f'[execute] Could not report results to server: {e}')
 
+    # Post-execution verification
+    if all_ok and server and token and case_id and candidate_id:
+        _verify_output(server, token, case_id, candidate_id, commands)
+
     return all_ok
+
+
+def _find_output_path(commands: list) -> str | None:
+    """Extract the output file path from dd of= or btrfs-restore target."""
+    for cmd in reversed(commands):
+        # dd of=/path/to/file
+        match = re.search(r'\bof=(\S+)', cmd)
+        if match:
+            return match.group(1)
+        # btrfs restore ... /target/dir  (last arg is the target)
+        tokens = shlex.split(cmd)
+        if tokens and os.path.basename(tokens[0]) == 'btrfs-restore' and len(tokens) >= 3:
+            return tokens[-1]
+    return None
+
+
+def _sha256_file(path: str, chunk_size: int = 65536) -> str:
+    """Compute SHA-256 hex digest of a file."""
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _verify_output(server: str, token: str, case_id: int,
+                   candidate_id: int, commands: list):
+    """Check if the output file exists and report verification to the server."""
+    output_path = _find_output_path(commands)
+    if not output_path:
+        print('[verify] Could not determine output file path from commands.')
+        return
+
+    file_exists = os.path.isfile(output_path)
+    file_size = os.path.getsize(output_path) if file_exists else 0
+    file_hash = ''
+    if file_exists and file_size < 1_073_741_824:  # hash files < 1 GB
+        try:
+            file_hash = _sha256_file(output_path)
+        except OSError:
+            pass
+
+    print(f'[verify] Output: {output_path}  exists={file_exists}  '
+          f'size={file_size}  sha256={file_hash[:16]}...')
+
+    url = f'{server.rstrip("/")}/api/cases/{case_id}/verify/{candidate_id}/'
+    payload = {
+        'file_exists': file_exists,
+        'file_size': file_size,
+        'sha256': file_hash,
+    }
+    try:
+        resp = requests.post(
+            url, json=payload,
+            headers={'Authorization': f'Token {token}'},
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            print(f'[verify] Server: {data.get("status", "?")} '
+                  f'(size_match={data.get("size_match", "?")})')
+        else:
+            print(f'[verify] Server returned HTTP {resp.status_code}')
+    except requests.exceptions.RequestException as e:
+        print(f'[verify] Could not report verification: {e}')

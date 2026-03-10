@@ -22,7 +22,9 @@ import time
 import requests
 from .models import (
     RecoveryCase, Artifact, CandidateFile, ChatSession, ChatMessage, AuditEvent,
+    Agent, AgentToken,
 )
+from .report import generate_report
 from .serializers import serialize_case, serialize_artifact, serialize_candidate, serialize_audit_event
 
 logger = logging.getLogger(__name__)
@@ -859,4 +861,171 @@ def agent_health(request):
         'server_version': '0.2.1',
         'user': request.user.username,
         'timestamp': timezone.now().isoformat(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Agent registration & heartbeat
+# ---------------------------------------------------------------------------
+@csrf_exempt
+def agent_register(request):
+    """POST /api/agent/register/ — register or update an agent machine.
+    Requires token auth.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    machine_name = data.get('machine_name', '').strip()
+    if not machine_name:
+        return JsonResponse({'error': '"machine_name" is required.'}, status=400)
+
+    # Resolve the AgentToken used for this request (set by middleware)
+    token_obj = None
+    if getattr(request, 'is_token_auth', False):
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth_header.startswith('Token '):
+            key = auth_header[6:].strip()
+            token_obj = AgentToken.objects.filter(key=key).first()
+
+    agent, created = Agent.objects.update_or_create(
+        user=request.user,
+        machine_name=machine_name,
+        defaults={
+            'token': token_obj,
+            'os_info': data.get('os_info', '')[:255],
+            'agent_version': data.get('agent_version', '')[:20],
+            'last_heartbeat': timezone.now(),
+            'is_active': True,
+        },
+    )
+
+    return JsonResponse({
+        'agent_id': agent.pk,
+        'status': 'registered' if created else 'updated',
+    }, status=201 if created else 200)
+
+
+@csrf_exempt
+def agent_heartbeat(request):
+    """POST /api/agent/heartbeat/ — update the agent's last_heartbeat.
+    Requires token auth.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    now = timezone.now()
+    updated = Agent.objects.filter(
+        user=request.user, is_active=True,
+    ).update(last_heartbeat=now)
+
+    if not updated:
+        return JsonResponse({'error': 'No registered agent found.'}, status=404)
+
+    return JsonResponse({
+        'status': 'ok',
+        'server_time': now.isoformat(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Post-recovery verification
+# ---------------------------------------------------------------------------
+@login_required
+@csrf_exempt
+def verify_candidate(request, case_id, candidate_id):
+    """POST /api/cases/<id>/verify/<candidate_id>/
+
+    Called by the agent after recovery to verify the output file.
+    Body: { "file_exists": bool, "file_size": int, "sha256": "..." }
+    Compares against CandidateFile metadata and updates status.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    candidate = get_object_or_404(CandidateFile, pk=candidate_id, case=case)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    file_exists = data.get('file_exists', False)
+    actual_size = data.get('file_size', 0)
+    actual_hash = data.get('sha256', '')
+
+    if not file_exists:
+        candidate.status = CandidateFile.STATUS_FAILED
+        candidate.save(update_fields=['status'])
+        _audit(case, request.user, AuditEvent.EVENT_RECOVERY_RESULT,
+               f'Verification failed for {candidate.file_name}: file does not exist',
+               {'candidate_id': candidate.pk, 'file_exists': False})
+        return JsonResponse({'status': 'failed', 'reason': 'file does not exist'})
+
+    # Compare file size
+    size_match = (actual_size == candidate.file_size) if candidate.file_size else True
+
+    if size_match:
+        candidate.status = CandidateFile.STATUS_RECOVERED
+        candidate.recovered_at = timezone.now()
+    else:
+        candidate.status = CandidateFile.STATUS_FAILED
+    candidate.save(update_fields=['status', 'recovered_at'])
+
+    _audit(case, request.user, AuditEvent.EVENT_RECOVERY_RESULT,
+           f'Verification {"passed" if size_match else "failed"} for {candidate.file_name}',
+           {
+               'candidate_id': candidate.pk,
+               'file_exists': True,
+               'expected_size': candidate.file_size,
+               'actual_size': actual_size,
+               'size_match': size_match,
+               'sha256': actual_hash[:64],
+           })
+
+    # Auto-transition case to COMPLETE if all non-skipped candidates are verified
+    pending = case.candidates.filter(status=CandidateFile.STATUS_PENDING).count()
+    if pending == 0 and case.can_transition_to(RecoveryCase.STATE_COMPLETE):
+        case.transition_to(RecoveryCase.STATE_COMPLETE)
+
+    return JsonResponse({
+        'status': 'verified' if size_match else 'failed',
+        'candidate_status': candidate.status,
+        'size_match': size_match,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Recovery report
+# ---------------------------------------------------------------------------
+
+@csrf_exempt
+@login_required
+def case_report_api(request, case_id):
+    """GET /api/cases/<id>/report/ — JSON recovery report."""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET only'}, status=405)
+
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    report = generate_report(case)
+    return JsonResponse(report)
+
+
+@login_required
+def case_report_view(request, case_id):
+    """Browser page: printable HTML report for a case."""
+    case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
+    report = generate_report(case)
+    return render(request, 'recovery/report.html', {
+        'case': case,
+        'report': report,
     })
