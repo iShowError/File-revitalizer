@@ -795,3 +795,181 @@ class PhaseCTests(TestCase):
         resp = anon.get(f'/api/cases/{case.pk}/report/')
         self.assertEqual(resp.status_code, 302)
         self.assertIn('login', resp.url)
+
+
+# ===================================================================
+# Phase E — Additional API endpoint coverage
+# ===================================================================
+
+class PhaseEAPITests(TestCase):
+    """Tests for Phase E: deeper API coverage — recovery result, agent health,
+    cross-user isolation, and terminal state guards."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='peuser', password='pass')
+        self.other = User.objects.create_user(username='peother', password='pass')
+        self.token = AgentToken.objects.create(user=self.user)
+        self.other_token = AgentToken.objects.create(user=self.other)
+        self.auth = f'Token {self.token.key}'
+        self.client = Client()
+
+    def _make_case_at_state(self, state, user=None):
+        user = user or self.user
+        case = RecoveryCase.objects.create(
+            user=user, title='PE Test', device_path='/dev/sdb',
+        )
+        path = {
+            RecoveryCase.STATE_SCANNING: [RecoveryCase.STATE_SCANNING],
+            RecoveryCase.STATE_ANALYZED: [RecoveryCase.STATE_SCANNING, RecoveryCase.STATE_ANALYZED],
+            RecoveryCase.STATE_RECOVERING: [
+                RecoveryCase.STATE_SCANNING, RecoveryCase.STATE_ANALYZED,
+                RecoveryCase.STATE_RECOVERING,
+            ],
+            RecoveryCase.STATE_VERIFYING: [
+                RecoveryCase.STATE_SCANNING, RecoveryCase.STATE_ANALYZED,
+                RecoveryCase.STATE_RECOVERING, RecoveryCase.STATE_VERIFYING,
+            ],
+            RecoveryCase.STATE_COMPLETE: [
+                RecoveryCase.STATE_SCANNING, RecoveryCase.STATE_ANALYZED,
+                RecoveryCase.STATE_RECOVERING, RecoveryCase.STATE_VERIFYING,
+                RecoveryCase.STATE_COMPLETE,
+            ],
+            RecoveryCase.STATE_FAILED: [RecoveryCase.STATE_SCANNING, RecoveryCase.STATE_FAILED],
+        }
+        for s in path.get(state, []):
+            case.transition_to(s)
+        return case
+
+    # -- recovery_result_api --
+
+    def test_recovery_result_all_ok_marks_recovered(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_RECOVERING)
+        cand = CandidateFile.objects.create(
+            case=case, inode_number=1, file_name='a.bin',
+            file_size=100, status=CandidateFile.STATUS_PENDING,
+        )
+        resp = self.client.post(
+            f'/api/cases/{case.pk}/recovery-result/',
+            data=json.dumps({
+                'candidate_id': cand.pk,
+                'results': [{'command': 'dd if=/dev/sdb of=/tmp/a', 'returncode': 0}],
+                'all_ok': True,
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(resp.status_code, 200)
+        cand.refresh_from_db()
+        self.assertEqual(cand.status, CandidateFile.STATUS_RECOVERED)
+
+    def test_recovery_result_not_ok_marks_failed(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_RECOVERING)
+        cand = CandidateFile.objects.create(
+            case=case, inode_number=2, file_name='b.bin',
+            file_size=200, status=CandidateFile.STATUS_PENDING,
+        )
+        resp = self.client.post(
+            f'/api/cases/{case.pk}/recovery-result/',
+            data=json.dumps({
+                'candidate_id': cand.pk,
+                'results': [],
+                'all_ok': False,
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data['candidate_status'], CandidateFile.STATUS_FAILED)
+
+    def test_recovery_result_creates_audit_event(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_RECOVERING)
+        cand = CandidateFile.objects.create(
+            case=case, inode_number=3, file_name='c.bin',
+            file_size=300, status=CandidateFile.STATUS_PENDING,
+        )
+        before = AuditEvent.objects.filter(case=case).count()
+        self.client.post(
+            f'/api/cases/{case.pk}/recovery-result/',
+            data=json.dumps({
+                'candidate_id': cand.pk, 'results': [], 'all_ok': True,
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        after = AuditEvent.objects.filter(case=case).count()
+        self.assertGreater(after, before)
+
+    def test_recovery_result_wrong_user_404(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_RECOVERING, user=self.other)
+        cand = CandidateFile.objects.create(
+            case=case, inode_number=4, file_name='d.bin',
+            file_size=400, status=CandidateFile.STATUS_PENDING,
+        )
+        resp = self.client.post(
+            f'/api/cases/{case.pk}/recovery-result/',
+            data=json.dumps({
+                'candidate_id': cand.pk, 'results': [], 'all_ok': True,
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    # -- agent_health --
+
+    def test_agent_health_returns_ok(self):
+        resp = self.client.get(
+            '/api/agent/health/',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'ok')
+        self.assertIn('timestamp', data)
+        self.assertEqual(data['user'], 'peuser')
+
+    def test_agent_health_no_auth_returns_401(self):
+        resp = Client().get('/api/agent/health/')
+        self.assertEqual(resp.status_code, 401)
+
+    # -- Cross-user isolation on report --
+
+    def test_report_api_wrong_user_404(self):
+        case = RecoveryCase.objects.create(
+            user=self.other, title='Other Report', device_path='/dev/sdb',
+        )
+        self.client.login(username='peuser', password='pass')
+        resp = self.client.get(f'/api/cases/{case.pk}/report/')
+        self.assertEqual(resp.status_code, 404)
+
+    # -- Cross-user isolation on verify --
+
+    def test_verify_wrong_user_404(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_VERIFYING, user=self.other)
+        cand = CandidateFile.objects.create(
+            case=case, inode_number=5, file_name='e.bin',
+            file_size=500, status=CandidateFile.STATUS_PENDING,
+        )
+        resp = self.client.post(
+            f'/api/cases/{case.pk}/verify/{cand.pk}/',
+            data=json.dumps({'file_exists': True, 'file_size': 500, 'sha256': ''}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    # -- Terminal state guards --
+
+    def test_complete_state_is_terminal(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_COMPLETE)
+        self.assertFalse(case.can_transition_to(RecoveryCase.STATE_SCANNING))
+        self.assertFalse(case.can_transition_to(RecoveryCase.STATE_FAILED))
+        with self.assertRaises(ValueError):
+            case.transition_to(RecoveryCase.STATE_FAILED)
+
+    def test_failed_state_is_terminal(self):
+        case = self._make_case_at_state(RecoveryCase.STATE_FAILED)
+        for s in [RecoveryCase.STATE_SCANNING, RecoveryCase.STATE_ANALYZED,
+                  RecoveryCase.STATE_RECOVERING, RecoveryCase.STATE_COMPLETE]:
+            self.assertFalse(case.can_transition_to(s))
