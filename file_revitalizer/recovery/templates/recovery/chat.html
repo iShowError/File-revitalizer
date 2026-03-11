@@ -2,6 +2,10 @@
 
 {% block title %}Recovery Assistant — Case #{{ case.id }} | File Revitalizer{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumbs"><a href="{% url 'dashboard' %}">Dashboard</a><span class="sep">/</span><a href="{% url 'cases_list' %}">My Cases</a><span class="sep">/</span><a href="{% url 'case_detail' case.id %}">Case #{{ case.id }}</a><span class="sep">/</span><span class="current">Chat</span></div>
+{% endblock %}
+
 {% block extra_head %}
 <style>
     .main { display: flex; flex: 1; overflow: hidden; }

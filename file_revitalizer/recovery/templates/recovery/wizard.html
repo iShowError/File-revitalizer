@@ -6,6 +6,10 @@
 <a href="{% url 'wizard' %}" style="color:var(--text);">New Recovery</a>
 {% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumbs"><a href="{% url 'dashboard' %}">Dashboard</a><span class="sep">/</span><span class="current">New Recovery</span></div>
+{% endblock %}
+
 {% block extra_head %}
 <style>
     .page { max-width: 680px; margin: 0 auto; padding: 2rem; }
@@ -200,11 +204,13 @@ async function createCase() {
         } else {
             err.textContent = data.error || 'Failed to create case.';
             err.style.display = 'block';
+            showToast(data.error || 'Failed to create case.', 'error');
             btn.disabled = false;
         }
     } catch (e) {
-        err.textContent = 'Network error — please try again.';
+        err.textContent = 'Network error \u2014 please try again.';
         err.style.display = 'block';
+        showToast('Network error \u2014 please try again.', 'error');
         btn.disabled = false;
     }
 }

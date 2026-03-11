@@ -2,6 +2,10 @@
 
 {% block title %}Recovery Cases — File Revitalizer{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumbs"><a href="{% url 'dashboard' %}">Dashboard</a><span class="sep">/</span><span class="current">My Cases</span></div>
+{% endblock %}
+
 {% block extra_head %}
 <style>
     .page { max-width: 1100px; margin: 0 auto; padding: 2rem; }
@@ -136,10 +140,12 @@ document.getElementById('new-case-form').addEventListener('submit', async functi
         } else {
             errEl.textContent = data.error || 'Failed to create case.';
             errEl.style.display = 'block';
+            showToast(data.error || 'Failed to create case.', 'error');
         }
     } catch (err) {
-        errEl.textContent = 'Network error — please try again.';
+        errEl.textContent = 'Network error \u2014 please try again.';
         errEl.style.display = 'block';
+        showToast('Network error \u2014 please try again.', 'error');
     }
 });
 </script>
