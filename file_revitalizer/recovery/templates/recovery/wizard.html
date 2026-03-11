@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}New Recovery — File Revitalizer{% endblock %}
+
+{% block nav_extra %}
+<a href="{% url 'wizard' %}" style="color:var(--text);">New Recovery</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .page { max-width: 680px; margin: 0 auto; padding: 2rem; }
+
+    .wizard-header { text-align: center; margin-bottom: 2rem; }
+    .wizard-header h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: .25rem; }
+    .wizard-header p { color: var(--text-muted); font-size: .875rem; }
+
+    /* ── steps indicator ── */
+    .steps { display: flex; align-items: center; justify-content: center; gap: .5rem; margin-bottom: 2.5rem; }
+    .step-num { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; border: 2px solid var(--border); color: var(--text-muted); transition: all .3s; flex-shrink: 0; }
+    .step-num.active { border-color: var(--accent); color: var(--accent); background: rgba(108,99,255,.12); }
+    .step-num.done   { border-color: var(--accent2); color: #0f1117; background: var(--accent2); }
+    .step-line { width: 40px; height: 2px; background: var(--border); transition: background .3s; }
+    .step-line.done { background: var(--accent2); }
+
+    /* ── panels ── */
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; display: none; }
+    .panel.active { display: block; }
+    .panel h2 { font-size: 1rem; font-weight: 700; margin-bottom: .25rem; }
+    .panel .hint { color: var(--text-muted); font-size: .8rem; margin-bottom: 1.25rem; }
+
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: .35rem; }
+    .field input, .field textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: .6rem .9rem; border-radius: 8px; font-size: .875rem; outline: none; transition: border-color .2s; font-family: inherit; }
+    .field input:focus, .field textarea:focus { border-color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 70px; }
+
+    .agent-check { display: flex; align-items: center; gap: .6rem; padding: 1rem; border-radius: 8px; font-size: .875rem; font-weight: 600; }
+    .agent-check.online  { background: rgba(46,213,115,.1); color: #2ed573; }
+    .agent-check.offline { background: rgba(255,71,87,.08); color: var(--danger); }
+    .agent-check i { font-size: 1.1rem; }
+    .agent-tip { color: var(--text-muted); font-size: .8rem; margin-top: .75rem; }
+
+    .review-item { display: flex; justify-content: space-between; padding: .6rem 0; border-bottom: 1px solid var(--border); font-size: .875rem; }
+    .review-item:last-child { border-bottom: none; }
+    .review-label { color: var(--text-muted); }
+    .review-value { font-weight: 600; text-align: right; word-break: break-all; }
+
+    .btn-row { display: flex; justify-content: space-between; margin-top: 1.5rem; }
+    .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .55rem 1.25rem; border-radius: 8px; font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: opacity .2s; font-family: inherit; }
+    .btn:hover { opacity: .82; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    .error-msg { color: var(--danger); font-size: .8rem; margin-top: .5rem; display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="wizard-header">
+        <h1><i class="fas fa-wand-magic-sparkles" style="color:var(--accent);"></i> New Recovery Case</h1>
+        <p>Follow the steps below to set up a new file recovery session.</p>
+    </div>
+
+    <!-- Steps indicator -->
+    <div class="steps">
+        <span class="step-num active" id="sn1">1</span>
+        <span class="step-line" id="sl1"></span>
+        <span class="step-num" id="sn2">2</span>
+        <span class="step-line" id="sl2"></span>
+        <span class="step-num" id="sn3">3</span>
+    </div>
+
+    <!-- Step 1: Case details -->
+    <div class="panel active" id="panel1">
+        <h2>Case Details</h2>
+        <p class="hint">Give your recovery case a name and specify the target device.</p>
+        <div class="field">
+            <label for="w-title">Case Title</label>
+            <input type="text" id="w-title" placeholder="e.g. My Linux server drive" maxlength="200" required>
+        </div>
+        <div class="field">
+            <label for="w-device">Device Path</label>
+            <input type="text" id="w-device" placeholder="e.g. /dev/sdb" maxlength="500" required>
+        </div>
+        <div class="field">
+            <label for="w-uuid">Filesystem UUID <span style="font-size:.65rem;text-transform:none;letter-spacing:0;">(optional)</span></label>
+            <input type="text" id="w-uuid" placeholder="e.g. 1a2b3c4d-..." maxlength="36">
+        </div>
+        <div class="field">
+            <label for="w-notes">Notes <span style="font-size:.65rem;text-transform:none;letter-spacing:0;">(optional)</span></label>
+            <textarea id="w-notes" placeholder="Any additional context about the damaged filesystem…"></textarea>
+        </div>
+        <div class="btn-row">
+            <span></span>
+            <button class="btn btn-primary" onclick="goStep(2)">Next <i class="fas fa-arrow-right"></i></button>
+        </div>
+        <p class="error-msg" id="err1"></p>
+    </div>
+
+    <!-- Step 2: Agent check -->
+    <div class="panel" id="panel2">
+        <h2>Agent Connection</h2>
+        <p class="hint">The local agent scans your device and uploads artifacts. Confirm it's connected.</p>
+        <div class="agent-check {% if agent_online %}online{% else %}offline{% endif %}">
+            <i class="fas {% if agent_online %}fa-circle-check{% else %}fa-circle-xmark{% endif %}"></i>
+            {% if agent_online %}Agent is online and ready.{% else %}No agent connected.{% endif %}
+        </div>
+        {% if not agent_online %}
+        <p class="agent-tip"><i class="fas fa-info-circle"></i> You can still create a case and upload artifacts manually. Install the local agent later for automated scanning.</p>
+        {% endif %}
+        <div class="btn-row">
+            <button class="btn btn-ghost" onclick="goStep(1)"><i class="fas fa-arrow-left"></i> Back</button>
+            <button class="btn btn-primary" onclick="goStep(3)">Next <i class="fas fa-arrow-right"></i></button>
+        </div>
+    </div>
+
+    <!-- Step 3: Review & create -->
+    <div class="panel" id="panel3">
+        <h2>Review &amp; Create</h2>
+        <p class="hint">Confirm the details below and create your recovery case.</p>
+        <div id="review-list">
+            <div class="review-item"><span class="review-label">Title</span><span class="review-value" id="rv-title"></span></div>
+            <div class="review-item"><span class="review-label">Device Path</span><span class="review-value" id="rv-device"></span></div>
+            <div class="review-item"><span class="review-label">UUID</span><span class="review-value" id="rv-uuid"></span></div>
+            <div class="review-item"><span class="review-label">Notes</span><span class="review-value" id="rv-notes"></span></div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-ghost" onclick="goStep(2)"><i class="fas fa-arrow-left"></i> Back</button>
+            <button class="btn btn-primary" id="btn-create" onclick="createCase()"><i class="fas fa-rocket"></i> Create Case</button>
+        </div>
+        <p class="error-msg" id="err3"></p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+let currentStep = 1;
+
+function goStep(n) {
+    // Validate step 1 before advancing
+    if (currentStep === 1 && n > 1) {
+        const title = document.getElementById('w-title').value.trim();
+        const device = document.getElementById('w-device').value.trim();
+        const err = document.getElementById('err1');
+        if (!title || !device) {
+            err.textContent = 'Title and device path are required.';
+            err.style.display = 'block';
+            return;
+        }
+        err.style.display = 'none';
+    }
+
+    // Populate review on step 3
+    if (n === 3) {
+        document.getElementById('rv-title').textContent  = document.getElementById('w-title').value.trim();
+        document.getElementById('rv-device').textContent = document.getElementById('w-device').value.trim();
+        document.getElementById('rv-uuid').textContent   = document.getElementById('w-uuid').value.trim() || '—';
+        document.getElementById('rv-notes').textContent  = document.getElementById('w-notes').value.trim() || '—';
+    }
+
+    currentStep = n;
+    for (let i = 1; i <= 3; i++) {
+        document.getElementById('panel' + i).classList.toggle('active', i === n);
+        const sn = document.getElementById('sn' + i);
+        sn.classList.remove('active', 'done');
+        if (i < n) sn.classList.add('done');
+        else if (i === n) sn.classList.add('active');
+    }
+    for (let i = 1; i <= 2; i++) {
+        document.getElementById('sl' + i).classList.toggle('done', i < n);
+    }
+}
+
+async function createCase() {
+    const btn = document.getElementById('btn-create');
+    const err = document.getElementById('err3');
+    btn.disabled = true;
+    err.style.display = 'none';
+
+    const body = {
+        title:           document.getElementById('w-title').value.trim(),
+        device_path:     document.getElementById('w-device').value.trim(),
+        filesystem_uuid: document.getElementById('w-uuid').value.trim(),
+        notes:           document.getElementById('w-notes').value.trim(),
+    };
+
+    try {
+        const res = await fetch('/api/cases/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            window.location.href = '/cases/' + data.case.id + '/';
+        } else {
+            err.textContent = data.error || 'Failed to create case.';
+            err.style.display = 'block';
+            btn.disabled = false;
+        }
+    } catch (e) {
+        err.textContent = 'Network error — please try again.';
+        err.style.display = 'block';
+        btn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

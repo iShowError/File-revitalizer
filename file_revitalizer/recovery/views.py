@@ -759,6 +759,17 @@ def cases_list_html(request):
 
 
 @login_required
+def wizard_view(request):
+    """GET /wizard/  → Guided recovery wizard page."""
+    agents = Agent.objects.filter(user=request.user, is_active=True)
+    threshold = timezone.now() - timezone.timedelta(minutes=2)
+    agent_online = agents.filter(last_heartbeat__gte=threshold).exists()
+    return render(request, 'recovery/wizard.html', {
+        'agent_online': agent_online,
+    })
+
+
+@login_required
 def case_detail_html(request, case_id):
     """GET /cases/<id>/  → Render the case detail page."""
     case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)

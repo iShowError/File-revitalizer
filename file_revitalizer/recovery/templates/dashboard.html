@@ -81,7 +81,7 @@
             <h2>Welcome back, {{ user.first_name|default:user.username }}</h2>
             <p>Start a new recovery case or continue where you left off.</p>
         </div>
-        <a href="{% url 'cases_list' %}" class="btn-new"><i class="fas fa-plus"></i> New Recovery Case</a>
+        <a href="{% url 'wizard' %}" class="btn-new"><i class="fas fa-plus"></i> New Recovery Case</a>
     </div>
 
     <!-- Stats -->

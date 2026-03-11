@@ -57,6 +57,7 @@ urlpatterns = [
     # -----------------------------------------------------------------------
     # Browser UI — Cases list and case detail pages
     # -----------------------------------------------------------------------
+    path('wizard/', views.wizard_view, name='wizard'),
     path('cases/', views.cases_list_html, name='cases_list'),
     path('cases/<int:case_id>/', views.case_detail_html, name='case_detail'),
     path('cases/<int:case_id>/report/', views.case_report_view, name='case_report_view'),
