@@ -1,315 +1,152 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard — File Revitalizer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        /* Custom Font */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Glassmorphism Sidebar */
-        .sidebar {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        /* Animation for elements scrolling into view */
-        .reveal {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.8s ease, transform 0.8s ease;
-        }
-        .reveal.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        /* 3D Tilt Effect for Stat Cards */
-        .stat-card {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        /* Shine effect on hover for cards */
-        .shine-effect {
-            position: relative;
-            overflow: hidden;
-        }
-        .shine-effect::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -150%;
-            width: 75%;
-            height: 100%;
-            background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0) 100%);
-            transform: skewX(-25deg);
-            transition: left 0.7s ease;
-        }
-        .shine-effect:hover::before {
-            left: 150%;
-        }
-        
-        /* Gradient text for titles */
-        .gradient-text {
-            background: linear-gradient(to right, #3b82f6, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-    </style>
-</head>
-<body class="bg-slate-100">
-    <div class="flex h-screen">
-        <!-- Sidebar -->
-        <div class="sidebar w-64 flex-shrink-0">
-            <div class="p-4 border-b">
-                <h1 class="text-xl font-bold flex items-center gradient-text">
-                    <i class="fas fa-shield-alt mr-2"></i>
-                    FileRevitalizer
-                </h1>
-            </div>
-            <nav class="p-4">
-                <ul class="space-y-2">
-                    <li><a href="{% url 'home' %}" class="flex items-center p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"><i class="fas fa-home w-6 text-center mr-3"></i>Home</a></li>
-                    <li><a href="{% url 'dashboard' %}" class="flex items-center p-2 bg-blue-100 text-blue-700 font-semibold rounded-lg"><i class="fas fa-chart-pie w-6 text-center mr-3"></i>Dashboard</a></li>
-                    <li><a href="/cases/" class="flex items-center p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-all"><i class="fas fa-folder-open w-6 text-center mr-3"></i>My Cases</a></li>
-                    <li><a href="{% url 'logout' %}" class="flex items-center p-2 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all"><i class="fas fa-sign-out-alt w-6 text-center mr-3"></i>Logout</a></li>
-                </ul>
-            </nav>
+{% extends "base.html" %}
+
+{% block title %}Dashboard — File Revitalizer{% endblock %}
+
+{% block extra_head %}
+<style>
+    .page { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+    .welcome { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem; }
+    .welcome h2 { font-size: 1.2rem; }
+    .welcome p { color: var(--text-muted); font-size: .875rem; margin-top: .25rem; }
+    .btn-new { display: inline-flex; align-items: center; gap: .5rem; background: var(--accent); color: #fff; font-weight: 600; padding: .55rem 1.25rem; border-radius: 8px; text-decoration: none; font-size: .875rem; transition: opacity .2s; }
+    .btn-new:hover { opacity: .85; }
+
+    /* ── stat cards ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; margin-bottom: 2rem; }
+    @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .stats-grid { grid-template-columns: 1fr; } }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 1.25rem 1.5rem; border-radius: 12px; transition: transform .3s ease, box-shadow .3s ease; }
+    .stat-top { display: flex; align-items: center; justify-content: space-between; }
+    .stat-label { color: var(--text-muted); font-size: .8rem; }
+    .stat-value { font-size: 2rem; font-weight: 800; margin-top: .35rem; }
+    .stat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .icon-total    { background: rgba(108,99,255,.15); color: var(--accent); }
+    .icon-active   { background: rgba(255,165,2,.15);  color: var(--warning); }
+    .icon-complete { background: rgba(0,212,170,.15);   color: var(--accent2); }
+    .icon-failed   { background: rgba(255,71,87,.15);   color: var(--danger); }
+
+    /* ── recent cases ── */
+    .recent-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .recent-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .recent-header h3 { font-size: 1rem; font-weight: 700; }
+    .recent-header a { color: var(--accent); font-size: .85rem; text-decoration: none; }
+    .recent-header a:hover { text-decoration: underline; }
+    .case-row { padding: .85rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; transition: background .15s; }
+    .case-row:last-child { border-bottom: none; }
+    .case-row:hover { background: var(--surface2); }
+    .case-title { font-weight: 600; font-size: .9rem; }
+    .case-device { font-family: monospace; font-size: .8rem; color: var(--text-muted); margin-top: .15rem; }
+    .case-meta { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
+    .badge { display: inline-block; padding: .2rem .65rem; border-radius: 999px; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .badge-complete   { background: #1a3530; color: #2ed573; }
+    .badge-failed     { background: #3a1a1a; color: var(--danger); }
+    .badge-recovering { background: #2d2a50; color: var(--accent); }
+    .badge-scanning   { background: #1a3555; color: #5badf0; }
+    .badge-analyzed   { background: #1a3535; color: var(--accent2); }
+    .badge-verifying  { background: #2a2535; color: #c084fc; }
+    .badge-created    { background: #2e3347; color: #8890a4; }
+    .case-date { color: var(--text-muted); font-size: .75rem; white-space: nowrap; }
+    .case-link { color: var(--accent); font-size: .875rem; text-decoration: none; }
+    .case-link:hover { color: var(--text); }
+    .empty-state { text-align: center; padding: 3rem 2rem; }
+    .empty-state i { font-size: 2.5rem; color: var(--border); margin-bottom: .75rem; display: block; }
+    .empty-state p { color: var(--text-muted); margin-bottom: 1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+
+    <!-- Welcome -->
+    <div class="welcome">
+        <div>
+            <h2>Welcome back, {{ user.first_name|default:user.username }}</h2>
+            <p>Start a new recovery case or continue where you left off.</p>
         </div>
+        <a href="{% url 'cases_list' %}" class="btn-new"><i class="fas fa-plus"></i> New Recovery Case</a>
+    </div>
 
-        <!-- Main Content -->
-        <div class="flex-1 overflow-auto">
-            <!-- Header -->
-            <header class="bg-white/80 backdrop-blur-sm sticky top-0 z-10 shadow-sm p-4">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-2xl font-bold text-slate-800">Dashboard</h2>
-                    <div class="flex items-center space-x-4">
-                        <div class="relative group">
-                            <input type="text" placeholder="Search..." class="pl-10 pr-4 py-2 border rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 w-48 focus:w-64 bg-slate-50">
-                            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <img src="https://placehold.co/40x40/E2E8F0/475569?text={{ user.username|first|upper }}" class="w-10 h-10 rounded-full border-2 border-transparent hover:border-blue-500 transition-all" alt="User Avatar">
-                            <span class="font-semibold text-slate-700">{{ user.username }}</span>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            <!-- Dashboard Content -->
-            <main class="p-6">
-
-                <!-- New Case CTA -->
-                <div class="mb-8 flex items-center justify-between">
-                    <div>
-                        <h3 class="text-lg font-semibold text-slate-700">Welcome back, {{ user.first_name|default:user.username }}</h3>
-                        <p class="text-slate-500 text-sm mt-1">Start a new recovery case or continue where you left off.</p>
-                    </div>
-                    <a href="/cases/" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition-colors">
-                        <i class="fas fa-plus"></i> New Recovery Case
-                    </a>
-                </div>
-
-                <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-slate-500 text-sm">Total Cases</p>
-                                <h3 class="text-3xl font-bold text-slate-800 mt-1">{{ total_cases }}</h3>
-                            </div>
-                            <div class="p-3 rounded-full bg-blue-100 text-blue-600"><i class="fas fa-folder-open text-xl"></i></div>
-                        </div>
-                    </div>
-                    <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal" style="transition-delay: 100ms;">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-slate-500 text-sm">In Progress</p>
-                                <h3 class="text-3xl font-bold text-yellow-600 mt-1">{{ active_cases }}</h3>
-                            </div>
-                            <div class="p-3 rounded-full bg-yellow-100 text-yellow-600"><i class="fas fa-sync-alt text-xl"></i></div>
-                        </div>
-                    </div>
-                    <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal" style="transition-delay: 200ms;">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-slate-500 text-sm">Completed</p>
-                                <h3 class="text-3xl font-bold text-green-600 mt-1">{{ completed_cases }}</h3>
-                            </div>
-                            <div class="p-3 rounded-full bg-green-100 text-green-600"><i class="fas fa-check-circle text-xl"></i></div>
-                        </div>
-                    </div>
-                    <div class="stat-card bg-white p-6 rounded-2xl shadow-md shine-effect reveal" style="transition-delay: 300ms;">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-slate-500 text-sm">Failed</p>
-                                <h3 class="text-3xl font-bold text-red-500 mt-1">{{ failed_cases }}</h3>
-                            </div>
-                            <div class="p-3 rounded-full bg-red-100 text-red-500"><i class="fas fa-exclamation-circle text-xl"></i></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recent Cases -->
-                <div class="bg-white rounded-2xl shadow-md reveal">
-                    <div class="p-6 border-b flex items-center justify-between">
-                        <h3 class="text-lg font-bold text-slate-800">Recent Recovery Cases</h3>
-                        <a href="/cases/" class="text-sm text-blue-600 hover:underline">View all &rarr;</a>
-                    </div>
-                    {% if recent_cases %}
-                    <div class="divide-y divide-slate-100">
-                        {% for case in recent_cases %}
-                        <div class="p-4 hover:bg-slate-50 transition-colors">
-                            <div class="flex items-center justify-between">
-                                <div class="min-w-0">
-                                    <h4 class="font-semibold text-slate-700 truncate">{{ case.title }}</h4>
-                                    <p class="text-sm text-slate-400 mt-0.5 font-mono truncate">{{ case.device_path }}</p>
-                                </div>
-                                <div class="flex items-center gap-3 ml-4 flex-shrink-0">
-                                    {% if case.state == 'COMPLETE' %}
-                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Complete</span>
-                                    {% elif case.state == 'FAILED' %}
-                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700">Failed</span>
-                                    {% elif case.state == 'RECOVERING' %}
-                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-700">Recovering</span>
-                                    {% elif case.state == 'SCANNING' %}
-                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-700">Scanning</span>
-                                    {% elif case.state == 'ANALYZED' %}
-                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700">Analyzed</span>
-                                    {% else %}
-                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-600">Created</span>
-                                    {% endif %}
-                                    <span class="text-slate-400 text-xs">{{ case.created_at|date:"M d, Y" }}</span>
-                                    <a href="/cases/{{ case.pk }}/" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fas fa-arrow-right"></i></a>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <div class="p-12 text-center">
-                        <i class="fas fa-folder-open text-4xl text-slate-300 mb-3"></i>
-                        <p class="text-slate-500 mb-4">No recovery cases yet.</p>
-                        <a href="/cases/" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-plus"></i> Create your first case
-                        </a>
-                    </div>
-                    {% endif %}
-                </div>
-
-            </main>
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-top">
+                <span class="stat-label">Total Cases</span>
+                <span class="stat-icon icon-total"><i class="fas fa-folder-open"></i></span>
+            </div>
+            <div class="stat-value">{{ total_cases }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top">
+                <span class="stat-label">In Progress</span>
+                <span class="stat-icon icon-active"><i class="fas fa-sync-alt"></i></span>
+            </div>
+            <div class="stat-value" style="color:var(--warning);">{{ active_cases }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top">
+                <span class="stat-label">Completed</span>
+                <span class="stat-icon icon-complete"><i class="fas fa-check-circle"></i></span>
+            </div>
+            <div class="stat-value" style="color:var(--accent2);">{{ completed_cases }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-top">
+                <span class="stat-label">Failed</span>
+                <span class="stat-icon icon-failed"><i class="fas fa-exclamation-circle"></i></span>
+            </div>
+            <div class="stat-value" style="color:var(--danger);">{{ failed_cases }}</div>
         </div>
     </div>
 
-    <script>
-        // --- SCROLL REVEAL ---
-        // (NumberScramble removed — stats now rendered server-side)
-        class NumberScramble {
-            constructor(el) {
-                this.el = el;
-                this.chars = '0123456789';
-                this.update = this.update.bind(this);
-            }
-            setText(newText) {
-                const oldText = this.el.innerText;
-                const length = Math.max(oldText.length, newText.length);
-                const promise = new Promise((resolve) => this.resolve = resolve);
-                this.queue = [];
-                for (let i = 0; i < length; i++) {
-                    const from = oldText[i] || '';
-                    const to = newText[i] || '';
-                    const start = Math.floor(Math.random() * 60);
-                    const end = start + Math.floor(Math.random() * 60);
-                    this.queue.push({ from, to, start, end });
-                }
-                cancelAnimationFrame(this.frameRequest);
-                this.frame = 0;
-                this.update();
-                return promise;
-            }
-            update() {
-                let output = '';
-                let complete = 0;
-                for (let i = 0, n = this.queue.length; i < n; i++) {
-                    let { from, to, start, end, char } = this.queue[i];
-                    if (this.frame >= end) {
-                        complete++;
-                        output += to;
-                    } else if (this.frame >= start) {
-                        if (!char || Math.random() < 0.28) {
-                            char = this.chars[Math.floor(Math.random() * this.chars.length)];
-                            this.queue[i].char = char;
-                        }
-                        output += `<span class="opacity-50">${char}</span>`;
-                    } else {
-                        output += from;
-                    }
-                }
-                this.el.innerHTML = output;
-                if (complete === this.queue.length) {
-                    this.resolve();
-                } else {
-                    this.frameRequest = requestAnimationFrame(this.update);
-                    this.frame++;
-                }
-            }
-        }
-        document.addEventListener('DOMContentLoaded', function() {
-            // --- INTERSECTION OBSERVER FOR SCROLL ANIMATIONS ---
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('visible');
-                        if (entry.target.classList.contains('stat-card')) {
-                            const numberEl = entry.target.querySelector('.number-scramble');
-                            if (numberEl && !numberEl.dataset.animated) {
-                                const fx = new NumberScramble(numberEl);
-                                fx.setText(numberEl.dataset.value);
-                                numberEl.dataset.animated = "true";
-                            }
-                        }
-                    }
-                });
-            }, { threshold: 0.1 });
-            document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-            // --- 3D TILT EFFECT & HOVER-TRIGGERED SCRAMBLE FOR STAT CARDS ---
-            document.querySelectorAll('.stat-card').forEach(card => {
-                card.addEventListener('mousemove', (e) => {
-                    const rect = card.getBoundingClientRect();
-                    const x = e.clientX - rect.left - rect.width / 2;
-                    const y = e.clientY - rect.top - rect.height / 2;
-                    const rotateX = -y / 20;
-                    const rotateY = x / 20;
-                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.05)`;
-                    card.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.25)';
-                });
-                card.addEventListener('mouseleave', () => {
-                    card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)';
-                    card.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
-                });
-                const numberEl = card.querySelector('.number-scramble');
-                if (numberEl) {
-                    const fx = new NumberScramble(numberEl);
-                    let isAnimating = false;
-                    card.addEventListener('mouseenter', () => {
-                        if (isAnimating) return;
-                        isAnimating = true;
-                        fx.setText(numberEl.dataset.value).then(() => {
-                            isAnimating = false;
-                        });
-                    });
-                }
-            });
-            // Recent cases are rendered server-side — no JS needed for the table.
+    <!-- Recent Cases -->
+    <div class="recent-card">
+        <div class="recent-header">
+            <h3>Recent Recovery Cases</h3>
+            <a href="{% url 'cases_list' %}">View all &rarr;</a>
+        </div>
+        {% if recent_cases %}
+        {% for case in recent_cases %}
+        <div class="case-row">
+            <div style="min-width:0;">
+                <div class="case-title">{{ case.title }}</div>
+                <div class="case-device">{{ case.device_path }}</div>
+            </div>
+            <div class="case-meta">
+                <span class="badge badge-{{ case.state|lower }}">{{ case.state }}</span>
+                <span class="case-date">{{ case.created_at|date:"M d, Y" }}</span>
+                <a href="{% url 'case_detail' case.pk %}" class="case-link"><i class="fas fa-arrow-right"></i></a>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-folder-open"></i>
+            <p>No recovery cases yet.</p>
+            <a href="{% url 'cases_list' %}" class="btn-new"><i class="fas fa-plus"></i> Create your first case</a>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.stat-card').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left - rect.width / 2;
+            const y = e.clientY - rect.top - rect.height / 2;
+            card.style.transform = `perspective(1000px) rotateX(${-y/20}deg) rotateY(${x/20}deg) scale(1.03)`;
+            card.style.boxShadow = '0 20px 40px -12px rgba(0,0,0,.4)';
         });
-    </script>
-</body>
-</html>
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = '';
+            card.style.boxShadow = '';
+        });
+    });
+});
+</script>
+{% endblock %}

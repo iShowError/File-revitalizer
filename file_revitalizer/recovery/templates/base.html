@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}File Revitalizer{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #23273a;
+            --border: #2e3347;
+            --accent: #6c63ff;
+            --accent2: #00d4aa;
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --text: #e8eaf0;
+            --text-muted: #8890a4;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        body.layout-fullheight {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            min-height: unset;
+        }
+        /* ── shared nav ── */
+        .main-nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            height: 56px;
+            flex-shrink: 0;
+        }
+        .main-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: .875rem;
+            transition: color .2s;
+        }
+        .main-nav a:hover, .main-nav a.active { color: var(--text); }
+        .main-nav .brand {
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 1rem;
+            margin-right: auto;
+            text-decoration: none;
+        }
+        .main-nav .nav-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .main-nav .nav-user { color: var(--text-muted); font-size: .8rem; }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body {% block body_attrs %}{% endblock %}>
+{% block body %}
+    <nav class="main-nav">
+        <a href="{% url 'home' %}" class="brand"><i class="fas fa-shield-alt"></i> FileRevitalizer</a>
+        <a href="{% url 'dashboard' %}">Dashboard</a>
+        <a href="{% url 'cases_list' %}">My Cases</a>
+        {% block nav_extra %}{% endblock %}
+        <span class="nav-right">
+            <span class="nav-user">{{ user.username }}</span>
+            <a href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i></a>
+        </span>
+    </nav>
+    {% block content %}{% endblock %}
+{% endblock %}
+{% block extra_js %}{% endblock %}
+</body>
+</html>

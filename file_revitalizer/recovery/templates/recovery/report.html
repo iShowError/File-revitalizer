@@ -1,65 +1,49 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report — Case #{{ case.pk }} | File Revitalizer</title>
-    <style>
-        :root {
-            --bg: #0f1117; --surface: #1a1d27; --surface2: #23273a;
-            --border: #2e3347; --accent: #6c63ff; --accent2: #00d4aa;
-            --danger: #ff4757; --warning: #ffa502;
-            --text: #e8eaf0; --text-muted: #8890a4;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+{% extends "base.html" %}
 
-        nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; gap: 1.5rem; height: 56px; }
-        nav a { color: var(--text-muted); text-decoration: none; font-size: .875rem; }
-        nav a:hover { color: var(--text); }
-        nav .brand { color: var(--accent); font-weight: 700; font-size: 1rem; margin-right: auto; }
+{% block title %}Report — Case #{{ case.pk }} | File Revitalizer{% endblock %}
 
-        .page { max-width: 900px; margin: 0 auto; padding: 2rem; }
-        h1 { font-size: 1.4rem; margin-bottom: .5rem; }
-        h2 { font-size: 1.1rem; margin: 1.5rem 0 .75rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
-        .meta { color: var(--text-muted); font-size: .8rem; }
+{% block nav_extra %}
+<a href="{% url 'cases_list' %}">Cases</a>
+<a href="{% url 'case_detail' case.pk %}">Case #{{ case.pk }}</a>
+{% endblock %}
 
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
-        .kv { display: flex; gap: .75rem; margin-bottom: .35rem; }
-        .kv .label { color: var(--text-muted); min-width: 130px; font-size: .85rem; }
-        .kv .value { font-size: .85rem; }
+{% block extra_head %}
+<style>
+    .page { max-width: 900px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 1.4rem; margin-bottom: .5rem; }
+    h2 { font-size: 1.1rem; margin: 1.5rem 0 .75rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
+    .meta { color: var(--text-muted); font-size: .8rem; }
 
-        table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-        th, td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
-        th { color: var(--text-muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+    .kv { display: flex; gap: .75rem; margin-bottom: .35rem; }
+    .kv .label { color: var(--text-muted); min-width: 130px; font-size: .85rem; }
+    .kv .value { font-size: .85rem; }
 
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .75rem; font-weight: 600; }
-        .badge-recovered { background: rgba(0,212,170,.15); color: var(--accent2); }
-        .badge-failed    { background: rgba(255,71,87,.15);  color: var(--danger); }
-        .badge-pending   { background: rgba(255,165,2,.15);  color: var(--warning); }
-        .badge-skipped   { background: rgba(136,144,164,.15);color: var(--text-muted); }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th, td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; }
 
-        .actions { display: flex; gap: .75rem; margin-bottom: 1.5rem; }
-        .btn { padding: .5rem 1rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; font-size: .85rem; text-decoration: none; }
-        .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .75rem; font-weight: 600; }
+    .badge-recovered { background: rgba(0,212,170,.15); color: var(--accent2); }
+    .badge-failed    { background: rgba(255,71,87,.15);  color: var(--danger); }
+    .badge-pending   { background: rgba(255,165,2,.15);  color: var(--warning); }
+    .badge-skipped   { background: rgba(136,144,164,.15);color: var(--text-muted); }
 
-        @media print {
-            body { background: #fff; color: #111; }
-            nav, .actions { display: none; }
-            .card { border-color: #ccc; }
-            th { color: #555; }
-            .page { max-width: 100%; }
-        }
-    </style>
-</head>
-<body>
-<nav>
-    <a class="brand" href="/">File Revitalizer</a>
-    <a href="{% url 'cases_list' %}">Cases</a>
-    <a href="{% url 'case_detail' case.pk %}">Case #{{ case.pk }}</a>
-    <a href="{% url 'dashboard' %}">Dashboard</a>
-</nav>
+    .actions { display: flex; gap: .75rem; margin-bottom: 1.5rem; }
+    .btn { padding: .5rem 1rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; font-size: .85rem; text-decoration: none; font-family: inherit; }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
 
+    @media print {
+        body { background: #fff; color: #111; }
+        .main-nav, .actions { display: none; }
+        .card { border-color: #ccc; }
+        th { color: #555; }
+        .page { max-width: 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
 <div class="page">
     <h1>Recovery Report — {{ case.title }}</h1>
     <p class="meta">Generated {{ report.generated_at }}</p>
@@ -70,7 +54,6 @@
         <a class="btn" href="{% url 'case_detail' case.pk %}">Back to Case</a>
     </div>
 
-    <!-- Case overview -->
     <h2>Case Overview</h2>
     <div class="card">
         <div class="kv"><span class="label">Case ID</span><span class="value">#{{ report.case.id }}</span></div>
@@ -87,7 +70,6 @@
         {% endif %}
     </div>
 
-    <!-- Candidates -->
     <h2>Candidate Files ({{ report.candidates.total }})</h2>
     <div class="card">
         {% if report.candidates.items %}
@@ -112,7 +94,6 @@
         {% endif %}
     </div>
 
-    <!-- Artifacts -->
     <h2>Artifacts ({{ report.artifacts.count }})</h2>
     <div class="card">
         {% if report.artifacts.items %}
@@ -134,7 +115,6 @@
         {% endif %}
     </div>
 
-    <!-- Timeline -->
     <h2>Timeline ({{ report.timeline|length }} events)</h2>
     <div class="card">
         {% if report.timeline %}
@@ -155,7 +135,6 @@
         {% endif %}
     </div>
 
-    <!-- Chat highlights -->
     {% if report.chat_summary %}
     <h2>Chat Highlights</h2>
     <div class="card">
@@ -168,5 +147,4 @@
     </div>
     {% endif %}
 </div>
-</body>
-</html>
+{% endblock %}

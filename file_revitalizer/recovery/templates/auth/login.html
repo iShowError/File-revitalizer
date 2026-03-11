@@ -1,115 +1,101 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - FileRevitalizer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .gradient-text {
-            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .alert-dismiss {
-            transition: opacity 0.5s ease, transform 0.5s ease;
-        }
-        .alert-dismiss.fade-out {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-    </style>
-</head>
-<body class="bg-gradient-to-br from-slate-50 to-slate-200 min-h-screen flex items-center justify-center">
-    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-        <!-- Header -->
-        <div class="text-center mb-8">
-            <a href="{% url 'home' %}" class="text-2xl font-black gradient-text flex items-center justify-center gap-2 mb-4">
-                <i class="fas fa-shield-alt"></i>
-                FileRevitalizer
-            </a>
-            <h1 class="text-2xl font-bold text-slate-800">Welcome Back</h1>
-            <p class="text-slate-600 mt-2">Sign in to access your recovery dashboard</p>
-        </div>
+{% extends "base.html" %}
 
-        <!-- Error Messages -->
+{% block title %}Login — File Revitalizer{% endblock %}
+
+{% block extra_head %}
+<style>
+    .auth-wrap { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); padding: 2rem; }
+    .auth-card { max-width: 420px; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; }
+    .auth-brand { text-align: center; margin-bottom: 1.5rem; }
+    .auth-brand a { color: var(--accent); font-size: 1.5rem; font-weight: 800; text-decoration: none; }
+    .auth-card h1 { font-size: 1.5rem; font-weight: 700; text-align: center; }
+    .auth-subtitle { color: var(--text-muted); text-align: center; font-size: .9rem; margin-top: .25rem; margin-bottom: 1.5rem; }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; font-size: .85rem; font-weight: 500; color: var(--text-muted); margin-bottom: .5rem; }
+    .input-wrap { position: relative; }
+    .input-wrap input { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: .65rem .75rem .65rem 2.5rem; border-radius: 8px; font-size: .9rem; outline: none; transition: border-color .2s; font-family: inherit; }
+    .input-wrap input:focus { border-color: var(--accent); }
+    .input-wrap input::placeholder { color: var(--text-muted); }
+    .input-wrap .icon { position: absolute; left: .75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: .85rem; }
+    .form-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; font-size: .85rem; }
+    .form-row label { display: flex; align-items: center; gap: .4rem; color: var(--text-muted); }
+    .form-row input[type=checkbox] { accent-color: var(--accent); }
+    .form-row a { color: var(--accent); text-decoration: none; }
+    .form-row a:hover { text-decoration: underline; }
+    .btn-submit { width: 100%; background: var(--accent); color: #fff; font-weight: 600; padding: .7rem; border: none; border-radius: 8px; font-size: .9rem; cursor: pointer; transition: opacity .2s; font-family: inherit; }
+    .btn-submit:hover { opacity: .85; }
+    .auth-footer { text-align: center; margin-top: 1.5rem; font-size: .9rem; color: var(--text-muted); }
+    .auth-footer a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .auth-footer a:hover { text-decoration: underline; }
+    .auth-back { text-align: center; margin-top: 1rem; }
+    .auth-back a { color: var(--text-muted); font-size: .85rem; text-decoration: none; }
+    .auth-back a:hover { color: var(--text); }
+    .alert { margin-bottom: 1rem; padding: .75rem 1rem; border-radius: 8px; font-size: .85rem; transition: opacity .5s, transform .5s; }
+    .alert.error { background: rgba(255,71,87,.1); color: var(--danger); border: 1px solid rgba(255,71,87,.25); }
+    .alert.success { background: rgba(0,212,170,.1); color: var(--accent2); border: 1px solid rgba(0,212,170,.25); }
+    .alert.fade-out { opacity: 0; transform: translateY(-10px); }
+</style>
+{% endblock %}
+
+{% block body %}
+<nav class="main-nav">
+    <a href="{% url 'home' %}" class="brand"><i class="fas fa-shield-alt"></i> FileRevitalizer</a>
+</nav>
+<div class="auth-wrap">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <a href="{% url 'home' %}"><i class="fas fa-shield-alt"></i> FileRevitalizer</a>
+        </div>
+        <h1>Welcome Back</h1>
+        <p class="auth-subtitle">Sign in to access your recovery dashboard</p>
+
         {% if messages %}
             {% for message in messages %}
-                <div class="alert-dismiss mb-4 p-4 rounded-lg {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% elif message.tags == 'success' %}bg-green-50 text-green-700 border border-green-200{% endif %}">
-                    <i class="fas fa-exclamation-circle mr-2"></i>{{ message }}
+                <div class="alert {% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% endif %} alert-dismiss">
+                    <i class="fas fa-exclamation-circle"></i> {{ message }}
                 </div>
             {% endfor %}
         {% endif %}
 
-        <!-- Login Form -->
-        <form method="post" class="space-y-6">
+        <form method="post">
             {% csrf_token %}
-            
-            <!-- Email Field -->
-            <div>
-                <label for="email" class="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
-                <div class="relative">
-                    <input type="email" id="email" name="email" required
-                           class="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                           placeholder="your@email.com" value="{{ request.POST.email|default:'' }}">
-                    <i class="fas fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <div class="input-wrap">
+                    <i class="fas fa-envelope icon"></i>
+                    <input type="email" id="email" name="email" required placeholder="your@email.com" value="{{ request.POST.email|default:'' }}">
                 </div>
             </div>
-
-            <!-- Password Field -->
-            <div>
-                <label for="password" class="block text-sm font-medium text-slate-700 mb-2">Password</label>
-                <div class="relative">
-                    <input type="password" id="password" name="password" required
-                           class="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                           placeholder="Your password">
-                    <i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="input-wrap">
+                    <i class="fas fa-lock icon"></i>
+                    <input type="password" id="password" name="password" required placeholder="Your password">
                 </div>
             </div>
-
-            <!-- Remember Me -->
-            <div class="flex items-center justify-between">
-                <label class="flex items-center">
-                    <input type="checkbox" name="remember_me" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                    <span class="ml-2 text-sm text-slate-600">Remember me</span>
-                </label>
-                <a href="#" class="text-sm text-blue-600 hover:text-blue-800">Forgot password?</a>
+            <div class="form-row">
+                <label><input type="checkbox" name="remember_me"> Remember me</label>
+                <a href="#">Forgot password?</a>
             </div>
-
-            <!-- Submit Button -->
-            <button type="submit" 
-                    class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 transition-all duration-300 shadow-lg shadow-blue-500/20">
-                <i class="fas fa-sign-in-alt mr-2"></i>Sign In
-            </button>
+            <button type="submit" class="btn-submit"><i class="fas fa-sign-in-alt"></i> Sign In</button>
         </form>
 
-        <!-- Register Link -->
-        <div class="mt-6 text-center">
-            <p class="text-slate-600">Don't have an account? 
-                <a href="{% url 'register' %}" class="text-blue-600 hover:text-blue-800 font-medium">Create one here</a>
-            </p>
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="{% url 'register' %}">Create one here</a></p>
         </div>
-
-        <!-- Back to Home -->
-        <div class="mt-4 text-center">
-            <a href="{% url 'home' %}" class="text-sm text-slate-500 hover:text-slate-700">
-                <i class="fas fa-arrow-left mr-2"></i>Back to Home
-            </a>
+        <div class="auth-back">
+            <a href="{% url 'home' %}"><i class="fas fa-arrow-left"></i> Back to Home</a>
         </div>
     </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const alerts = document.querySelectorAll('.alert-dismiss');
-            alerts.forEach(function(alert) {
-                setTimeout(function() {
-                    alert.classList.add('fade-out');
-                    setTimeout(function() { alert.remove(); }, 500);
-                }, 5000);
-            });
-        });
-    </script>
-</body>
-</html>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.alert-dismiss').forEach(function(alert) {
+        setTimeout(function() {
+            alert.classList.add('fade-out');
+            setTimeout(function() { alert.remove(); }, 500);
+        }, 5000);
+    });
+});
+</script>
+{% endblock %}

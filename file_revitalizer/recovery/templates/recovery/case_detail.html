@@ -1,116 +1,82 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Case #{{ case.pk }} — {{ case.title }} | File Revitalizer</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --bg: #0f1117; --surface: #1a1d27; --surface2: #23273a;
-            --border: #2e3347; --accent: #6c63ff; --accent2: #00d4aa;
-            --danger: #ff4757; --warning: #ffa502;
-            --text: #e8eaf0; --text-muted: #8890a4;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+{% extends "base.html" %}
 
-        nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; gap: 1.5rem; height: 56px; }
-        nav a { color: var(--text-muted); text-decoration: none; font-size: .875rem; transition: color .2s; }
-        nav a:hover { color: var(--text); }
-        nav .brand { color: var(--accent); font-weight: 700; font-size: 1rem; margin-right: auto; text-decoration: none; }
+{% block title %}Case #{{ case.pk }} — {{ case.title }} | File Revitalizer{% endblock %}
 
-        .page { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+{% block nav_extra %}
+<a href="/cases/{{ case.pk }}/" style="color:var(--text);">Case #{{ case.pk }}</a>
+{% endblock %}
 
-        /* ── header row ── */
-        .case-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
-        .case-header h1 { font-size: 1.4rem; font-weight: 700; }
-        .case-header .meta { color: var(--text-muted); font-size: .8rem; margin-top: .3rem; font-family: monospace; }
+{% block extra_head %}
+<style>
+    .page { max-width: 1100px; margin: 0 auto; padding: 2rem; }
 
-        /* ── state badge ── */
-        .badge { display: inline-block; padding: .25rem .75rem; border-radius: 999px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
-        .badge-created    { background: #2e3347; color: #8890a4; }
-        .badge-scanning   { background: #1a3555; color: #5badf0; }
-        .badge-analyzed   { background: #1a3535; color: var(--accent2); }
-        .badge-recovering { background: #2d2a50; color: var(--accent); }
-        .badge-complete   { background: #1a3530; color: #2ed573; }
-        .badge-failed     { background: #3a1a1a; color: var(--danger); }
+    .case-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
+    .case-header h1 { font-size: 1.4rem; font-weight: 700; }
+    .case-header .meta { color: var(--text-muted); font-size: .8rem; margin-top: .3rem; font-family: monospace; }
 
-        /* ── action buttons ── */
-        .actions { display: flex; gap: .6rem; flex-wrap: wrap; }
-        .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem 1rem; border-radius: 8px; font-size: .8rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: opacity .2s; white-space: nowrap; }
-        .btn:hover { opacity: .82; }
-        .btn-primary  { background: var(--accent); color: #fff; }
-        .btn-teal     { background: var(--accent2); color: #0f1117; }
-        .btn-ghost    { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-        .btn-chat     { background: #1a3555; color: #5badf0; }
-        .btn-danger   { background: #3a1a1a; color: var(--danger); border: 1px solid #5a2a2a; }
+    .badge { display: inline-block; padding: .25rem .75rem; border-radius: 999px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .badge-created    { background: #2e3347; color: #8890a4; }
+    .badge-scanning   { background: #1a3555; color: #5badf0; }
+    .badge-analyzed   { background: #1a3535; color: var(--accent2); }
+    .badge-recovering { background: #2d2a50; color: var(--accent); }
+    .badge-complete   { background: #1a3530; color: #2ed573; }
+    .badge-failed     { background: #3a1a1a; color: var(--danger); }
 
-        /* ── two-column layout ── */
-        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-        @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+    .actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+    .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem 1rem; border-radius: 8px; font-size: .8rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: opacity .2s; white-space: nowrap; font-family: inherit; }
+    .btn:hover { opacity: .82; }
+    .btn-primary  { background: var(--accent); color: #fff; }
+    .btn-teal     { background: var(--accent2); color: #0f1117; }
+    .btn-ghost    { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-chat     { background: #1a3555; color: #5badf0; }
 
-        /* ── card ── */
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; }
-        .card h2 { font-size: .85rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 1rem; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
 
-        /* ── info grid ── */
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-        .info-item { display: flex; flex-direction: column; gap: .2rem; }
-        .info-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
-        .info-value { font-size: .875rem; font-weight: 600; word-break: break-all; }
-        .info-value.mono { font-family: monospace; font-size: .8rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; }
+    .card h2 { font-size: .85rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 1rem; }
 
-        /* ── transition buttons ── */
-        .transitions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--border); }
-        .btn-trans { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); padding: .3rem .8rem; border-radius: 6px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .2s; }
-        .btn-trans:hover { border-color: var(--accent); color: var(--accent); }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .info-item { display: flex; flex-direction: column; gap: .2rem; }
+    .info-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+    .info-value { font-size: .875rem; font-weight: 600; word-break: break-all; }
+    .info-value.mono { font-family: monospace; font-size: .8rem; }
 
-        /* ── artifacts ── */
-        .artifact-row { display: flex; align-items: center; justify-content: space-between; padding: .6rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; }
-        .artifact-row:last-child { border-bottom: none; }
-        .artifact-type { font-weight: 600; font-family: monospace; }
-        .artifact-meta { color: var(--text-muted); font-size: .75rem; }
-        .parsed-yes { color: var(--accent2); font-size: .72rem; font-weight: 700; }
-        .parsed-no  { color: var(--warning); font-size: .72rem; font-weight: 700; }
+    .transitions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--border); }
+    .btn-trans { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); padding: .3rem .8rem; border-radius: 6px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .2s; font-family: inherit; }
+    .btn-trans:hover { border-color: var(--accent); color: var(--accent); }
 
-        /* ── upload form ── */
-        .upload-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; gap: .6rem; flex-wrap: wrap; }
-        .upload-form select, .upload-form textarea { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: .45rem .8rem; font-size: .8rem; outline: none; }
-        .upload-form select { flex-shrink: 0; }
-        .upload-form textarea { flex: 1; min-width: 0; resize: vertical; min-height: 60px; }
-        .upload-form select:focus, .upload-form textarea:focus { border-color: var(--accent); }
+    .artifact-row { display: flex; align-items: center; justify-content: space-between; padding: .6rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; }
+    .artifact-row:last-child { border-bottom: none; }
+    .artifact-type { font-weight: 600; font-family: monospace; }
+    .artifact-meta { color: var(--text-muted); font-size: .75rem; }
+    .parsed-yes { color: var(--accent2); font-size: .72rem; font-weight: 700; }
+    .parsed-no  { color: var(--warning); font-size: .72rem; font-weight: 700; }
 
-        /* ── audit ── */
-        .audit-row { padding: .55rem 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
-        .audit-row:last-child { border-bottom: none; }
-        .audit-event { font-weight: 600; color: var(--accent2); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; }
-        .audit-summary { color: var(--text); margin-top: .15rem; }
-        .audit-time { color: var(--text-muted); font-size: .72rem; margin-top: .1rem; }
+    .upload-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; gap: .6rem; flex-wrap: wrap; }
+    .upload-form select, .upload-form textarea { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: .45rem .8rem; font-size: .8rem; outline: none; font-family: inherit; }
+    .upload-form select { flex-shrink: 0; }
+    .upload-form textarea { flex: 1; min-width: 0; resize: vertical; min-height: 60px; }
+    .upload-form select:focus, .upload-form textarea:focus { border-color: var(--accent); }
 
-        /* ── candidates summary bar ── */
-        .cand-bar { display: flex; align-items: center; justify-content: space-between; }
-        .cand-count { font-size: 2rem; font-weight: 800; color: var(--accent); }
-        .cand-sub { color: var(--text-muted); font-size: .8rem; }
+    .audit-row { padding: .55rem 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
+    .audit-row:last-child { border-bottom: none; }
+    .audit-event { font-weight: 600; color: var(--accent2); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; }
+    .audit-summary { color: var(--text); margin-top: .15rem; }
+    .audit-time { color: var(--text-muted); font-size: .72rem; margin-top: .1rem; }
 
-        /* ── inline feedback ── */
-        .feedback { font-size: .8rem; margin-top: .5rem; display: none; }
-        .feedback.ok  { color: var(--accent2); }
-        .feedback.err { color: var(--danger); }
-    </style>
-</head>
-<body>
+    .cand-bar { display: flex; align-items: center; justify-content: space-between; }
+    .cand-count { font-size: 2rem; font-weight: 800; color: var(--accent); }
+    .cand-sub { color: var(--text-muted); font-size: .8rem; }
 
-<nav>
-    <a href="{% url 'home' %}" class="brand"><i class="fas fa-shield-alt"></i> FileRevitalizer</a>
-    <a href="{% url 'dashboard' %}">Dashboard</a>
-    <a href="/cases/">My Cases</a>
-    <a href="/cases/{{ case.pk }}/" style="color:var(--text);">Case #{{ case.pk }}</a>
-</nav>
+    .feedback { font-size: .8rem; margin-top: .5rem; display: none; }
+    .feedback.ok  { color: var(--accent2); }
+    .feedback.err { color: var(--danger); }
+</style>
+{% endblock %}
 
+{% block content %}
 <div class="page">
-
-    <!-- Header -->
     <div class="case-header">
         <div>
             <h1>{{ case.title }}</h1>
@@ -123,8 +89,6 @@
     </div>
 
     <div class="grid2">
-
-        <!-- Case info + state machine -->
         <div class="card">
             <h2>Case Info</h2>
             <div class="info-grid">
@@ -153,8 +117,6 @@
                 </div>
                 {% endif %}
             </div>
-
-            <!-- State transitions -->
             <div class="transitions" id="transitions">
                 <span style="font-size:.75rem;color:var(--text-muted);align-self:center;">Advance state:</span>
                 {% for next_state in allowed_transitions %}
@@ -166,7 +128,6 @@
             <p class="feedback" id="trans-feedback"></p>
         </div>
 
-        <!-- Candidates summary -->
         <div class="card">
             <h2>Candidates</h2>
             <div class="cand-bar">
@@ -189,10 +150,8 @@
         </div>
     </div>
 
-    <!-- Artifacts -->
     <div class="card" style="margin-bottom:1.5rem;">
         <h2>Artifacts &nbsp;<span style="color:var(--text);font-size:.9rem;font-weight:700;">{{ artifacts|length }}</span></h2>
-
         {% if artifacts %}
         {% for art in artifacts %}
         <div class="artifact-row">
@@ -216,7 +175,6 @@
         <p style="color:var(--text-muted);font-size:.85rem;">No artifacts yet. Use the local agent to scan your device and upload artifacts, or paste raw output below.</p>
         {% endif %}
 
-        <!-- Quick upload form -->
         <div class="upload-form">
             <select id="art-type">
                 <option value="superblock">superblock</option>
@@ -234,7 +192,6 @@
         <p class="feedback" id="art-feedback"></p>
     </div>
 
-    <!-- Audit trail -->
     <div class="card">
         <h2>Recent Audit Events</h2>
         {% if audit_events %}
@@ -249,9 +206,10 @@
         <p style="color:var(--text-muted);font-size:.85rem;">No events yet.</p>
         {% endif %}
     </div>
-
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 const CASE_ID = {{ case.pk }};
 const CSRF = '{{ csrf_token }}';
@@ -309,6 +267,4 @@ async function uploadArtifact() {
     }
 }
 </script>
-
-</body>
-</html>
+{% endblock %}

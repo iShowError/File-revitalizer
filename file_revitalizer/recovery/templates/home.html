@@ -1,119 +1,81 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FileRevitalizer | Advanced Data Recovery</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Custom Google Font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+{% extends "base.html" %}
 
-    <style>
-        .step-circle {
-            width: 6rem; /* 96px */
-            height: 6rem; /* 96px */
-            border-radius: 9999px; /* full circle */
-            border-width: 2px;
-            border-color: #cbd5e1; /* slate-300 */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.25rem; /* text-4xl */
-            font-weight: 900; /* font-black */
-            color: #cbd5e1; /* slate-300 */
-            transition: all 0.5s ease;
-            position: relative;
-            z-index: 10;
-            background-color: var(--color-light); /* Same as body background */
-        }
-        .step-circle.glow {
-            border-color: var(--color-primary);
-            color: var(--color-primary);
-            box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
-        }
-        /* Base styling and custom properties */
-        :root {
-            --color-primary: #3b82f6;
-            --color-secondary: #8b5cf6;
-            --color-dark: #1e293b;
-            --color-light: #f1f5f9;
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--color-light);
-            color: var(--color-dark);
-        }
-        /* Gradient text utility */
-        .gradient-text {
-            background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        /* Glassmorphism effect for the header */
-        .glass-header {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(203, 213, 225, 0.5);
-        }
-        /* Custom animation for the hero section SVG */
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 20px 5px rgba(59, 130, 246, 0.2); }
-            50% { box-shadow: 0 0 40px 15px rgba(139, 92, 246, 0.3); }
-        }
-        .animate-pulse-glow {
-            animation: pulse-glow 5s ease-in-out infinite;
-        }
-        
-        /* Hide scrollbar for a cleaner look */
-        html {
-            scrollbar-width: none; /* For Firefox */
-        }
-        body::-webkit-scrollbar {
-            display: none; /* For Chrome, Safari, and Opera */
-        }
-        
-        /* Gemini AI Section Styling */
-        .gemini-card {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        .gemini-response h4 {
-            font-weight: 700;
-            color: var(--color-dark);
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-        }
-        .gemini-response p {
-            color: #334155;
-        }
-        .loader {
-            width: 48px;
-            height: 48px;
-            border: 5px solid var(--color-primary);
-            border-bottom-color: transparent;
-            border-radius: 50%;
-            display: inline-block;
-            box-sizing: border-box;
-            animation: rotation 1s linear infinite;
-        }
-        @keyframes rotation {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
-</head>
-<body class="antialiased">
+{% block title %}FileRevitalizer | Advanced Data Recovery{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    /* ── Dark theme overrides for Tailwind utilities ── */
+    .bg-white { background: var(--surface) !important; }
+    .bg-slate-50 { background: var(--surface2) !important; }
+    .text-slate-800, .text-slate-700 { color: var(--text) !important; }
+    .text-slate-600, .text-slate-500 { color: var(--text-muted) !important; }
+    .text-slate-300 { color: var(--text-muted) !important; }
+    .border-slate-200, .border-slate-300 { border-color: var(--border) !important; }
+
+    :root {
+        --color-primary: #6c63ff;
+        --color-secondary: #8b5cf6;
+        --color-dark: #e8eaf0;
+        --color-light: #0f1117;
+    }
+
+    .gradient-text {
+        background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .glass-header {
+        background: rgba(26, 29, 39, 0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border);
+    }
+    @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 20px 5px rgba(108, 99, 255, 0.2); }
+        50% { box-shadow: 0 0 40px 15px rgba(139, 92, 246, 0.3); }
+    }
+    .animate-pulse-glow { animation: pulse-glow 5s ease-in-out infinite; }
+
+    html { scrollbar-width: none; }
+    body::-webkit-scrollbar { display: none; }
+
+    .step-circle {
+        width: 6rem; height: 6rem; border-radius: 9999px;
+        border-width: 2px; border-color: var(--border);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2.25rem; font-weight: 900; color: var(--text-muted);
+        transition: all 0.5s ease; position: relative; z-index: 10;
+        background-color: var(--bg);
+    }
+    .step-circle.glow {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+        box-shadow: 0 0 25px rgba(108, 99, 255, 0.5);
+    }
+
+    .gemini-card {
+        background: rgba(26, 29, 39, 0.85);
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border: 1px solid var(--border);
+    }
+    .gemini-response h4 { font-weight: 700; color: var(--text); margin-top: 1rem; margin-bottom: 0.5rem; }
+    .gemini-response p { color: var(--text-muted); }
+    .loader {
+        width: 48px; height: 48px;
+        border: 5px solid var(--color-primary);
+        border-bottom-color: transparent;
+        border-radius: 50%; display: inline-block;
+        box-sizing: border-box;
+        animation: rotation 1s linear infinite;
+    }
+    @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block body %}
+<body class="antialiased" style="background:var(--bg);color:var(--text);">
 
     <!-- Header -->
     <header id="header" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300">
@@ -123,16 +85,16 @@
                 FileRevitalizer
             </a>
             <nav class="hidden md:flex items-center space-x-8">
-                <a href="#features" class="text-slate-600 hover:text-blue-600 font-medium transition-colors">Features</a>
-                <a href="#how-it-works" class="text-slate-600 hover:text-blue-600 font-medium transition-colors">How It Works</a>
-                <a href="#ai-diagnosis" class="text-slate-600 hover:text-blue-600 font-medium transition-colors">✨ AI Diagnosis</a>
+                <a href="#features" class="text-[#8890a4] hover:text-[#6c63ff] font-medium transition-colors">Features</a>
+                <a href="#how-it-works" class="text-[#8890a4] hover:text-[#6c63ff] font-medium transition-colors">How It Works</a>
+                <a href="#ai-diagnosis" class="text-[#8890a4] hover:text-[#6c63ff] font-medium transition-colors">&#10024; AI Diagnosis</a>
             </nav>
             {% if user.is_authenticated %}
-            <a href="{% url 'dashboard' %}" class="magnetic-button hidden md:inline-block bg-slate-800 text-white font-semibold px-6 py-3 rounded-full hover:bg-slate-900 transition-all duration-300 shadow-lg">
+            <a href="{% url 'dashboard' %}" class="magnetic-button hidden md:inline-block bg-[#6c63ff] text-white font-semibold px-6 py-3 rounded-full hover:opacity-90 transition-all duration-300 shadow-lg">
                 <span>Go to Dashboard</span>
             </a>
             {% else %}
-            <a href="{% url 'login' %}" class="magnetic-button hidden md:inline-block bg-white text-slate-800 font-semibold px-6 py-3 rounded-full hover:bg-slate-50 border border-slate-200 transition-all duration-300 shadow-md">
+            <a href="{% url 'login' %}" class="magnetic-button hidden md:inline-block bg-[#1a1d27] text-[#e8eaf0] font-semibold px-6 py-3 rounded-full hover:bg-[#23273a] border border-[#2e3347] transition-all duration-300 shadow-md">
                 <span>Sign In</span>
             </a>
             {% endif %}
@@ -143,19 +105,19 @@
     <main>
         <!-- Hero Section -->
         <section class="relative h-screen flex items-center justify-center text-center overflow-hidden pt-20">
-            <div class="absolute inset-0 bg-gradient-to-br from-slate-50 to-slate-200 -z-10"></div>
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-200 rounded-full blur-3xl opacity-50 animate-pulse-glow"></div>
-            
+            <div class="absolute inset-0 bg-gradient-to-br from-[#0f1117] to-[#1a1d27] -z-10"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#6c63ff]/30 rounded-full blur-3xl opacity-50 animate-pulse-glow"></div>
+
             <div class="container mx-auto px-6">
-                <h1 class="text-5xl md:text-7xl lg:text-8xl font-black text-slate-800 leading-tight">
-                    <div class="split-text-wrapper"><div data-animation="text-slide">Bring Your Lost</div></div>
+                <h1 class="text-5xl md:text-7xl lg:text-8xl font-black leading-tight">
+                    <div class="split-text-wrapper"><div data-animation="text-slide" style="color:var(--text);">Bring Your Lost</div></div>
                     <div class="split-text-wrapper"><div data-animation="text-slide" class="gradient-text">Files Back to Life.</div></div>
                 </h1>
-                <p data-animation="fade-in" class="mt-6 max-w-2xl mx-auto text-lg text-slate-600">
+                <p data-animation="fade-in" class="mt-6 max-w-2xl mx-auto text-lg" style="color:var(--text-muted);">
                     The most advanced and intuitive solution for recovering data from BTRFS and XFS filesystems. Powerful, fast, and reliable.
                 </p>
                 <div data-animation="fade-in" class="mt-10 flex justify-center items-center">
-                    <a href="{% url 'dashboard' %}" class="magnetic-button bg-blue-600 text-white font-semibold px-8 py-4 rounded-full hover:bg-blue-700 transition-all duration-300 shadow-lg shadow-blue-500/20">
+                    <a href="{% url 'dashboard' %}" class="magnetic-button bg-[#6c63ff] text-white font-semibold px-8 py-4 rounded-full hover:opacity-90 transition-all duration-300 shadow-lg shadow-[#6c63ff]/20">
                         <span>Start Recovery Now</span>
                     </a>
                 </div>
@@ -163,30 +125,27 @@
         </section>
 
         <!-- Features Section -->
-        <section id="features" class="py-20 bg-white">
+        <section id="features" class="py-20" style="background:var(--surface);">
             <div class="container mx-auto px-6">
                 <div class="text-center mb-12">
-                    <h2 class="text-4xl font-bold text-slate-800" data-animation="fade-in">Powerful Features, Simple Interface</h2>
-                    <p class="mt-4 text-lg text-slate-600 max-w-2xl mx-auto" data-animation="fade-in">Everything you need for a successful data recovery operation.</p>
+                    <h2 class="text-4xl font-bold" data-animation="fade-in" style="color:var(--text);">Powerful Features, Simple Interface</h2>
+                    <p class="mt-4 text-lg max-w-2xl mx-auto" data-animation="fade-in" style="color:var(--text-muted);">Everything you need for a successful data recovery operation.</p>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <!-- Feature Card 1 -->
-                    <div class="feature-card bg-slate-50 p-8 rounded-2xl border border-slate-200" data-animation="fade-in">
-                        <div class="text-3xl text-blue-600 mb-4"><i class="fas fa-search-plus"></i></div>
-                        <h3 class="text-xl font-bold mb-2">Deep Scan Engine</h3>
-                        <p class="text-slate-600">Our proprietary algorithm performs a sector-by-sector analysis to find every recoverable file, even from severely corrupted drives.</p>
+                    <div class="feature-card p-8 rounded-2xl border" data-animation="fade-in" style="background:var(--surface2);border-color:var(--border);">
+                        <div class="text-3xl mb-4" style="color:var(--accent);"><i class="fas fa-search-plus"></i></div>
+                        <h3 class="text-xl font-bold mb-2" style="color:var(--text);">Deep Scan Engine</h3>
+                        <p style="color:var(--text-muted);">Our proprietary algorithm performs a sector-by-sector analysis to find every recoverable file, even from severely corrupted drives.</p>
                     </div>
-                    <!-- Feature Card 2 -->
-                    <div class="feature-card bg-slate-50 p-8 rounded-2xl border border-slate-200" data-animation="fade-in">
-                        <div class="text-3xl text-purple-600 mb-4"><i class="fas fa-file-shield"></i></div>
-                        <h3 class="text-xl font-bold mb-2">Filesystem Reconstruction</h3>
-                        <p class="text-slate-600">Intelligently rebuilds B-tree structures and metadata, recovering files with their original names and folder paths intact.</p>
+                    <div class="feature-card p-8 rounded-2xl border" data-animation="fade-in" style="background:var(--surface2);border-color:var(--border);">
+                        <div class="text-3xl mb-4" style="color:#8b5cf6;"><i class="fas fa-file-shield"></i></div>
+                        <h3 class="text-xl font-bold mb-2" style="color:var(--text);">Filesystem Reconstruction</h3>
+                        <p style="color:var(--text-muted);">Intelligently rebuilds B-tree structures and metadata, recovering files with their original names and folder paths intact.</p>
                     </div>
-                    <!-- Feature Card 3 -->
-                    <div class="feature-card bg-slate-50 p-8 rounded-2xl border border-slate-200" data-animation="fade-in">
-                        <div class="text-3xl text-green-600 mb-4"><i class="fas fa-eye"></i></div>
-                        <h3 class="text-xl font-bold mb-2">Live File Preview</h3>
-                        <p class="text-slate-600">Preview recoverable files before committing to a full recovery, ensuring you get exactly what you need.</p>
+                    <div class="feature-card p-8 rounded-2xl border" data-animation="fade-in" style="background:var(--surface2);border-color:var(--border);">
+                        <div class="text-3xl mb-4" style="color:var(--accent2);"><i class="fas fa-eye"></i></div>
+                        <h3 class="text-xl font-bold mb-2" style="color:var(--text);">Live File Preview</h3>
+                        <p style="color:var(--text-muted);">Preview recoverable files before committing to a full recovery, ensuring you get exactly what you need.</p>
                     </div>
                 </div>
             </div>
@@ -196,53 +155,48 @@
         <section id="how-it-works" class="py-20">
             <div class="container mx-auto px-6">
                 <div class="text-center mb-16">
-                    <h2 class="text-4xl font-bold text-slate-800" data-animation="fade-in">Recovery in 3 Simple Steps</h2>
-                    <p class="mt-4 text-lg text-slate-600 max-w-2xl mx-auto" data-animation="fade-in">A straightforward process from start to finish.</p>
+                    <h2 class="text-4xl font-bold" data-animation="fade-in" style="color:var(--text);">Recovery in 3 Simple Steps</h2>
+                    <p class="mt-4 text-lg max-w-2xl mx-auto" data-animation="fade-in" style="color:var(--text-muted);">A straightforward process from start to finish.</p>
                 </div>
                 <div class="relative flex justify-between items-start">
-                    <!-- The connecting line SVG - now with two paths -->
                     <svg id="connecting-line-svg" class="absolute top-12 left-0 w-full h-24 -z-10" preserveAspectRatio="none">
-                        <path id="line1" d="" stroke="#cbd5e1" stroke-width="2" fill="none" stroke-dasharray="10 5"/>
-                        <path id="line2" d="" stroke="#cbd5e1" stroke-width="2" fill="none" stroke-dasharray="10 5"/>
+                        <path id="line1" d="" stroke="#2e3347" stroke-width="2" fill="none" stroke-dasharray="10 5"/>
+                        <path id="line2" d="" stroke="#2e3347" stroke-width="2" fill="none" stroke-dasharray="10 5"/>
                     </svg>
-
-                    <!-- Step 1 -->
                     <div class="step-card text-center w-1/3 px-4" data-animation="fade-in">
                         <div class="step-circle mx-auto mb-6 glow">01</div>
-                        <h3 class="text-xl font-bold mb-2">Upload Disk Image</h3>
-                        <p class="text-slate-600">Securely upload your disk image file (.img, .dd, .raw). Our system supports images of any size.</p>
+                        <h3 class="text-xl font-bold mb-2" style="color:var(--text);">Upload Disk Image</h3>
+                        <p style="color:var(--text-muted);">Securely upload your disk image file (.img, .dd, .raw). Our system supports images of any size.</p>
                     </div>
-                    <!-- Step 2 -->
                     <div class="step-card text-center w-1/3 px-4" data-animation="fade-in">
                         <div class="step-circle mx-auto mb-6">02</div>
-                        <h3 class="text-xl font-bold mb-2">Scan & Preview</h3>
-                        <p class="text-slate-600">Initiate the scan. Our engine will analyze the image and present a browsable list of recoverable files.</p>
+                        <h3 class="text-xl font-bold mb-2" style="color:var(--text);">Scan &amp; Preview</h3>
+                        <p style="color:var(--text-muted);">Initiate the scan. Our engine will analyze the image and present a browsable list of recoverable files.</p>
                     </div>
-                    <!-- Step 3 -->
                     <div class="step-card text-center w-1/3 px-4" data-animation="fade-in">
                         <div class="step-circle mx-auto mb-6">03</div>
-                        <h3 class="text-xl font-bold mb-2">Download Files</h3>
-                        <p class="text-slate-600">Select the files you need and download them directly to your local machine in a secure .zip archive.</p>
+                        <h3 class="text-xl font-bold mb-2" style="color:var(--text);">Download Files</h3>
+                        <p style="color:var(--text-muted);">Select the files you need and download them directly to your local machine in a secure .zip archive.</p>
                     </div>
                 </div>
             </div>
         </section>
-        
+
         <!-- Stats Section -->
-        <section class="py-20 bg-white">
+        <section class="py-20" style="background:var(--surface);">
             <div class="container mx-auto px-6">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
                     <div data-animation="fade-in">
                         <h2 class="text-5xl font-bold gradient-text"><span class="stat-number" data-value="98.7">0</span>%</h2>
-                        <p class="text-slate-600 mt-2">Average Success Rate</p>
+                        <p class="mt-2" style="color:var(--text-muted);">Average Success Rate</p>
                     </div>
                     <div data-animation="fade-in">
                         <h2 class="text-5xl font-bold gradient-text"><span class="stat-number" data-value="500">0</span>+</h2>
-                        <p class="text-slate-600 mt-2">Terabytes Recovered</p>
+                        <p class="mt-2" style="color:var(--text-muted);">Terabytes Recovered</p>
                     </div>
                     <div data-animation="fade-in">
                         <h2 class="text-5xl font-bold gradient-text"><span class="stat-number" data-value="10">0</span>k+</h2>
-                        <p class="text-slate-600 mt-2">Happy Users</p>
+                        <p class="mt-2" style="color:var(--text-muted);">Happy Users</p>
                     </div>
                 </div>
             </div>
@@ -250,17 +204,17 @@
 
         <!-- AI Smart Diagnosis Section -->
         <section id="ai-diagnosis" class="py-20 relative overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-br from-blue-600 to-purple-600 -z-10"></div>
+            <div class="absolute inset-0 bg-gradient-to-br from-[#6c63ff] to-[#8b5cf6] -z-10"></div>
             <div class="container mx-auto px-6">
                 <div class="text-center mb-12">
-                    <h2 class="text-4xl font-bold text-white" data-animation="fade-in">✨ AI Smart Diagnosis</h2>
+                    <h2 class="text-4xl font-bold text-white" data-animation="fade-in">&#10024; AI Smart Diagnosis</h2>
                     <p class="mt-4 text-lg text-blue-200 max-w-2xl mx-auto" data-animation="fade-in">Describe your data loss problem and get an instant expert analysis.</p>
                 </div>
                 <div class="max-w-3xl mx-auto">
                     {% if user.is_authenticated %}
                     <div class="gemini-card p-8 rounded-2xl shadow-2xl" data-animation="fade-in">
-                        <textarea id="ai-prompt" class="w-full h-32 p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white/50" placeholder="e.g., 'I accidentally formatted my external hard drive, it was an XFS partition...'"></textarea>
-                        <button id="ai-submit" class="magnetic-button mt-4 w-full bg-slate-800 text-white font-semibold py-3 rounded-full hover:bg-slate-900 transition-all duration-300 shadow-lg flex items-center justify-center">
+                        <textarea id="ai-prompt" class="w-full h-32 p-4 rounded-lg transition-all" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);" placeholder="e.g., 'I accidentally formatted my external hard drive, it was an XFS partition...'"></textarea>
+                        <button id="ai-submit" class="magnetic-button mt-4 w-full font-semibold py-3 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center" style="background:var(--surface);color:var(--text);">
                             <span class="flex items-center gap-2">
                                 <i class="fas fa-wand-magic-sparkles"></i>
                                 <span>Analyze My Situation</span>
@@ -269,27 +223,24 @@
                     </div>
                     {% else %}
                     <div class="gemini-card p-8 rounded-2xl shadow-2xl text-center" data-animation="fade-in">
-                        <p class="text-slate-700 text-lg mb-4">Sign in to use AI-powered diagnosis.</p>
-                        <a href="{% url 'login' %}" class="magnetic-button inline-block bg-slate-800 text-white font-semibold px-8 py-3 rounded-full hover:bg-slate-900 transition-all duration-300 shadow-lg">Sign In</a>
+                        <p class="text-lg mb-4" style="color:var(--text);">Sign in to use AI-powered diagnosis.</p>
+                        <a href="{% url 'login' %}" class="magnetic-button inline-block font-semibold px-8 py-3 rounded-full transition-all duration-300 shadow-lg" style="background:var(--surface);color:var(--text);">Sign In</a>
                     </div>
                     {% endif %}
                     <div id="ai-result" class="mt-6 gemini-card p-8 rounded-2xl shadow-2xl hidden" data-animation="fade-in">
                         <div id="ai-loader" class="text-center hidden">
                             <div class="loader mx-auto"></div>
-                            <p class="mt-4 text-slate-600">Our AI expert is analyzing your case...</p>
+                            <p class="mt-4" style="color:var(--text-muted);">Our AI expert is analyzing your case...</p>
                         </div>
-                        <div id="ai-response-content" class="gemini-response">
-                            <!-- Gemini API response will be injected here -->
-                        </div>
+                        <div id="ai-response-content" class="gemini-response"></div>
                     </div>
                 </div>
             </div>
         </section>
-
     </main>
 
     <!-- Footer -->
-    <footer class="bg-slate-800 text-slate-300 py-12">
+    <footer class="py-12" style="background:var(--surface);color:var(--text-muted);">
         <div class="container mx-auto px-6 text-center">
             <p>&copy; 2025 FileRevitalizer. All Rights Reserved.</p>
         </div>
@@ -302,16 +253,12 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // --- SMOOTH SCROLL SETUP ---
             const lenis = new Lenis();
-            function raf(time) {
-                lenis.raf(time);
-                requestAnimationFrame(raf);
-            }
+            function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
             requestAnimationFrame(raf);
-            // --- GSAP ANIMATIONS ---
+
             gsap.registerPlugin(ScrollTrigger);
-            // Header animation on scroll
+
             gsap.to("#header", {
                 scrollTrigger: {
                     trigger: "body",
@@ -319,186 +266,122 @@
                     end: "+=100",
                     scrub: 1,
                     onUpdate: (self) => {
-                        if (self.progress > 0) {
-                            document.getElementById('header').classList.add('glass-header');
-                        } else {
-                            document.getElementById('header').classList.remove('glass-header');
-                        }
+                        if (self.progress > 0) { document.getElementById('header').classList.add('glass-header'); }
+                        else { document.getElementById('header').classList.remove('glass-header'); }
                     }
                 }
             });
-            // General fade-in animation for elements
+
             gsap.utils.toArray('[data-animation="fade-in"]').forEach(el => {
                 gsap.fromTo(el, { opacity: 0, y: 30 }, {
-                    opacity: 1,
-                    y: 0,
-                    duration: 1,
-                    ease: 'power3.out',
-                    scrollTrigger: {
-                        trigger: el,
-                        start: 'top 85%',
-                        toggleActions: 'play none none none'
-                    }
+                    opacity: 1, y: 0, duration: 1, ease: 'power3.out',
+                    scrollTrigger: { trigger: el, start: 'top 85%', toggleActions: 'play none none none' }
                 });
             });
-            // Hero text slide-up animation
+
             gsap.utils.toArray('[data-animation="text-slide"]').forEach((el, index) => {
-                gsap.from(el, {
-                    y: '100%',
-                    opacity: 0,
-                    duration: 1.2,
-                    ease: 'power4.out',
-                    delay: 0.5 + index * 0.2
-                });
+                gsap.from(el, { y: '100%', opacity: 0, duration: 1.2, ease: 'power4.out', delay: 0.5 + index * 0.2 });
             });
-            
-            // Feature card 3D tilt effect
+
             gsap.utils.toArray('.feature-card').forEach(card => {
                 card.addEventListener('mousemove', (e) => {
                     const rect = card.getBoundingClientRect();
                     const x = e.clientX - rect.left - rect.width / 2;
                     const y = e.clientY - rect.top - rect.height / 2;
-                    gsap.to(card, {
-                        rotationY: x * 0.05,
-                        rotationX: -y * 0.05,
-                        transformPerspective: 1000,
-                        ease: 'power1.out'
-                    });
+                    gsap.to(card, { rotationY: x * 0.05, rotationX: -y * 0.05, transformPerspective: 1000, ease: 'power1.out' });
                 });
                 card.addEventListener('mouseleave', () => {
                     gsap.to(card, { rotationY: 0, rotationX: 0, ease: 'power3.out', duration: 1 });
                 });
             });
-            // Magnetic button effect
+
             gsap.utils.toArray('.magnetic-button').forEach(button => {
                 const span = button.querySelector('span');
+                if (!span) return;
                 button.addEventListener('mousemove', (e) => {
                     const rect = button.getBoundingClientRect();
-                    const x = (e.clientX - rect.left - rect.width / 2) * 0.5;
-                    const y = (e.clientY - rect.top - rect.height / 2) * 0.5;
-                    gsap.to(span, { x: x, y: y, duration: 0.3, ease: 'power1.out' });
+                    gsap.to(span, { x: (e.clientX - rect.left - rect.width / 2) * 0.5, y: (e.clientY - rect.top - rect.height / 2) * 0.5, duration: 0.3, ease: 'power1.out' });
                 });
                 button.addEventListener('mouseleave', () => {
                     gsap.to(span, { x: 0, y: 0, duration: 0.5, ease: 'elastic.out(1, 0.3)' });
                 });
             });
-            // Animated stats counter
+
             gsap.utils.toArray('.stat-number').forEach(el => {
                 const endValue = parseFloat(el.dataset.value);
                 gsap.from(el, {
-                    textContent: 0,
-                    duration: 2,
-                    ease: 'power1.inOut',
-                    snap: { textContent: 1 },
-                    scrollTrigger: {
-                        trigger: el,
-                        start: 'top 90%',
-                        toggleActions: 'play none none none'
-                    },
+                    textContent: 0, duration: 2, ease: 'power1.inOut', snap: { textContent: 1 },
+                    scrollTrigger: { trigger: el, start: 'top 90%', toggleActions: 'play none none none' },
                     onUpdate: function() {
-                        if (endValue.toString().includes('.')) {
-                            this.targets()[0].textContent = parseFloat(this.targets()[0].textContent).toFixed(1);
-                        } else {
-                            this.targets()[0].textContent = Math.round(this.targets()[0].textContent);
-                        }
+                        this.targets()[0].textContent = endValue.toString().includes('.')
+                            ? parseFloat(this.targets()[0].textContent).toFixed(1)
+                            : Math.round(this.targets()[0].textContent);
                     }
                 });
             });
-            
-            // "How It Works" connecting line animation
+
             const stepCards = gsap.utils.toArray('.step-card');
             const stepCircles = gsap.utils.toArray('.step-circle');
             const line1 = document.querySelector('#line1');
             const line2 = document.querySelector('#line2');
+
             function drawLines() {
                 if (stepCards.length === 3) {
-                    const startPoint = { x: stepCards[0].offsetLeft + stepCards[0].offsetWidth / 2, y: 0 };
-                    const midPoint = { x: stepCards[1].offsetLeft + stepCards[1].offsetWidth / 2, y: 0 };
-                    const endPoint = { x: stepCards[2].offsetLeft + stepCards[2].offsetWidth / 2, y: 0 };
-                    const pathData1 = `M ${startPoint.x} ${midPoint.y} L ${midPoint.x} ${midPoint.y}`;
-                    const pathData2 = `M ${midPoint.x} ${midPoint.y} L ${endPoint.x} ${endPoint.y}`;
-                    
-                    line1.setAttribute('d', pathData1);
-                    line2.setAttribute('d', pathData2);
-                    const line1Length = line1.getTotalLength();
-                    const line2Length = line2.getTotalLength();
+                    const p1 = { x: stepCards[0].offsetLeft + stepCards[0].offsetWidth / 2 };
+                    const p2 = { x: stepCards[1].offsetLeft + stepCards[1].offsetWidth / 2 };
+                    const p3 = { x: stepCards[2].offsetLeft + stepCards[2].offsetWidth / 2 };
+                    line1.setAttribute('d', `M ${p1.x} 0 L ${p2.x} 0`);
+                    line2.setAttribute('d', `M ${p2.x} 0 L ${p3.x} 0`);
                     const tl = gsap.timeline({
                         scrollTrigger: {
-                            trigger: '#how-it-works',
-                            start: 'top center',
-                            end: 'bottom bottom',
-                            scrub: 1,
+                            trigger: '#how-it-works', start: 'top center', end: 'bottom bottom', scrub: 1,
                             onUpdate: (self) => {
                                 self.progress > 0.45 ? stepCircles[1].classList.add('glow') : stepCircles[1].classList.remove('glow');
                                 self.progress > 0.95 ? stepCircles[2].classList.add('glow') : stepCircles[2].classList.remove('glow');
                             }
                         }
                     });
-                    tl.from(line1, {
-                        strokeDashoffset: line1Length,
-                        strokeDasharray: line1Length,
-                        duration: 1
-                    });
-                    tl.from(line2, {
-                        strokeDashoffset: line2Length,
-                        strokeDasharray: line2Length,
-                        duration: 1
-                    }, ">-0.2");
+                    tl.from(line1, { strokeDashoffset: line1.getTotalLength(), strokeDasharray: line1.getTotalLength(), duration: 1 });
+                    tl.from(line2, { strokeDashoffset: line2.getTotalLength(), strokeDasharray: line2.getTotalLength(), duration: 1 }, ">-0.2");
                 }
             }
             drawLines();
             window.addEventListener('resize', drawLines);
-            // --- GEMINI API INTEGRATION ---
+
             const aiSubmitBtn = document.getElementById('ai-submit');
             const aiPromptEl = document.getElementById('ai-prompt');
             const aiResultEl = document.getElementById('ai-result');
             const aiLoaderEl = document.getElementById('ai-loader');
             const aiResponseContentEl = document.getElementById('ai-response-content');
-            aiSubmitBtn.addEventListener('click', async () => {
-                const userPrompt = aiPromptEl.value;
-                if (!userPrompt.trim()) {
-                    alert('Please describe your data loss situation.');
-                    return;
-                }
-                aiResultEl.classList.remove('hidden');
-                aiLoaderEl.classList.remove('hidden');
-                aiResponseContentEl.classList.add('hidden');
-                
-                try {
-                    const response = await fetch('/api/diagnose/', {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCookie('csrftoken') // Function to get CSRF token
-                        },
-                        body: JSON.stringify({ prompt: userPrompt })
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || `API Error: ${response.statusText}`);
+            if (aiSubmitBtn) {
+                aiSubmitBtn.addEventListener('click', async () => {
+                    const userPrompt = aiPromptEl.value;
+                    if (!userPrompt.trim()) { alert('Please describe your data loss situation.'); return; }
+                    aiResultEl.classList.remove('hidden');
+                    aiLoaderEl.classList.remove('hidden');
+                    aiResponseContentEl.classList.add('hidden');
+                    try {
+                        const response = await fetch('/api/diagnose/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                            body: JSON.stringify({ prompt: userPrompt })
+                        });
+                        if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `API Error: ${response.statusText}`); }
+                        const result = await response.json();
+                        if (result.response) {
+                            aiResponseContentEl.innerHTML = result.response
+                                .replace(/\*\*(.*?)\*\*/g, '<h4>$1</h4>')
+                                .replace(/\n/g, '<br>');
+                        } else { throw new Error('No content received from the API.'); }
+                    } catch (error) {
+                        aiResponseContentEl.innerHTML = `<p style="color:var(--danger);">Sorry, something went wrong. Error: ${error.message}</p>`;
+                    } finally {
+                        aiLoaderEl.classList.add('hidden');
+                        aiResponseContentEl.classList.remove('hidden');
                     }
-                    
-                    const result = await response.json();
-                    
-                    if (result.response) {
-                        let html = result.response
-                            .replace(/\*\*(.*?)\*\*/g, '<h4>$1</h4>')
-                            .replace(/\n/g, '<br>');
-                        aiResponseContentEl.innerHTML = html;
-                    } else {
-                        throw new Error('No content received from the API.');
-                    }
-                } catch (error) {
-                    console.error("AI API call failed:", error);
-                    aiResponseContentEl.innerHTML = `<p class="text-red-500">Sorry, something went wrong. The AI expert is currently unavailable. Please try again later. Error: ${error.message}</p>`;
-                } finally {
-                    aiLoaderEl.classList.add('hidden');
-                    aiResponseContentEl.classList.remove('hidden');
-                }
-            });
+                });
+            }
 
-            // Helper function to get CSRF token
             function getCookie(name) {
                 let cookieValue = null;
                 if (document.cookie && document.cookie !== '') {
@@ -516,4 +399,4 @@
         });
     </script>
 </body>
-</html>
+{% endblock %}

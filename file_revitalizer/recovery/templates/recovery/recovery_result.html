@@ -1,63 +1,48 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recovery Result | File Revitalizer</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --bg: #0f1117; --surface: #1a1d27; --surface2: #23273a;
-            --border: #2e3347; --accent: #6c63ff; --accent2: #00d4aa;
-            --danger: #ff4757; --warning: #ffa502; --text: #e8eaf0; --text-muted: #8890a4;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); }
-        nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; gap: 1.5rem; height: 56px; }
-        nav a { color: var(--text-muted); text-decoration: none; font-size: .875rem; }
-        nav a:hover { color: var(--text); }
-        nav .brand { color: var(--accent); font-weight: 700; font-size: 1rem; margin-right: auto; }
-        .page { max-width: 900px; margin: 0 auto; padding: 2rem; }
-        h1 { font-size: 1.4rem; margin-bottom: .25rem; }
-        .subtitle { color: var(--text-muted); font-size: .875rem; margin-bottom: 2rem; }
+{% extends "base.html" %}
 
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
-        .card h2 { font-size: 1rem; margin-bottom: 1rem; color: var(--accent2); }
-        .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
-        .meta-item .label { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
-        .meta-item .value { font-size: .9rem; font-weight: 600; margin-top: .2rem; }
+{% block title %}Recovery Result | File Revitalizer{% endblock %}
 
-        .strategy { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-        .strategy-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
-        .strategy-type { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .2rem .6rem; border-radius: 999px; }
-        .t-dd_single   { background: #1a3535; color: var(--accent2); }
-        .t-dd_multi    { background: #2d2a50; color: var(--accent); }
-        .t-btrfs_restore { background: #1a2a3a; color: #5badf0; }
-        .t-error       { background: #3a1a1a; color: var(--danger); }
+{% block nav_extra %}
+<a href="/cases/{{ case.id }}/candidates/">Candidates</a>
+{% endblock %}
 
-        .cmd-block { background: #0d1117; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: .82rem; overflow-x: auto; white-space: pre; line-height: 1.7; }
-        .cmd-block .cmd-line { color: #e8eaf0; }
-        .cmd-block .cmd-comment { color: var(--text-muted); }
+{% block extra_head %}
+<style>
+    .page { max-width: 900px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 1.4rem; margin-bottom: .25rem; }
+    .subtitle { color: var(--text-muted); font-size: .875rem; margin-bottom: 2rem; }
 
-        .warning-list { margin-top: .75rem; }
-        .warning-list li { font-size: .82rem; color: var(--warning); list-style: none; padding: .2rem 0; }
-        .warning-list li::before { content: '⚠ '; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .card h2 { font-size: 1rem; margin-bottom: 1rem; color: var(--accent2); }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+    .meta-item .label { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+    .meta-item .value { font-size: .9rem; font-weight: 600; margin-top: .2rem; }
 
-        .copy-btn { float: right; font-size: .75rem; padding: .25rem .6rem; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 4px; cursor: pointer; }
-        .copy-btn:hover { color: var(--text); }
+    .strategy { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .strategy-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+    .strategy-type { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .2rem .6rem; border-radius: 999px; }
+    .t-dd_single   { background: #1a3535; color: var(--accent2); }
+    .t-dd_multi    { background: #2d2a50; color: var(--accent); }
+    .t-btrfs_restore { background: #1a2a3a; color: #5badf0; }
+    .t-error       { background: #3a1a1a; color: var(--danger); }
 
-        .back-link { display: inline-block; margin-top: 1rem; color: var(--text-muted); font-size: .85rem; text-decoration: none; }
-        .back-link:hover { color: var(--text); }
-    </style>
-</head>
-<body>
-<nav>
-    <a href="/" class="brand"><i class="fa fa-hard-drive"></i> File Revitalizer</a>
-    <a href="/dashboard/">Dashboard</a>
-    <a href="/cases/{{ case.id }}/candidates/">← Candidates</a>
-</nav>
+    .cmd-block { background: #0d1117; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: .82rem; overflow-x: auto; white-space: pre; line-height: 1.7; }
+    .cmd-block .cmd-line { color: #e8eaf0; }
+    .cmd-block .cmd-comment { color: var(--text-muted); }
 
+    .warning-list { margin-top: .75rem; }
+    .warning-list li { font-size: .82rem; color: var(--warning); list-style: none; padding: .2rem 0; }
+    .warning-list li::before { content: '\26A0  '; }
+
+    .copy-btn { float: right; font-size: .75rem; padding: .25rem .6rem; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 4px; cursor: pointer; }
+    .copy-btn:hover { color: var(--text); }
+
+    .back-link { display: inline-block; margin-top: 1rem; color: var(--text-muted); font-size: .85rem; text-decoration: none; }
+    .back-link:hover { color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
 <div class="page">
     <h1><i class="fa fa-terminal" style="color:var(--accent)"></i> Recovery Commands</h1>
     <p class="subtitle">
@@ -65,7 +50,6 @@
         Candidate #{{ candidate.id }}: <strong>{{ candidate.file_name|default:"unnamed" }}</strong>
     </p>
 
-    <!-- File metadata -->
     <div class="card">
         <h2><i class="fa fa-file"></i> File Metadata</h2>
         <div class="meta-grid">
@@ -103,7 +87,6 @@
         {% endif %}
     </div>
 
-    <!-- Recovery strategies -->
     <div class="card">
         <h2><i class="fa fa-terminal"></i> Recovery Strategies</h2>
         <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem">
@@ -155,16 +138,17 @@
         <i class="fa fa-arrow-left"></i> Back to Candidate Table
     </a>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 const allCmds = {{ commands_json|safe }};
 function copyCommands(btn, idx) {
     const lines = allCmds[idx] || [];
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
-        btn.textContent = '✓ Copied!';
+        btn.textContent = '\u2713 Copied!';
         setTimeout(() => btn.innerHTML = '<i class="fa fa-copy"></i> Copy', 2000);
     });
 }
 </script>
-</body>
-</html>
+{% endblock %}
