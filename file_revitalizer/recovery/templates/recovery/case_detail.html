@@ -262,16 +262,22 @@ function feedback(id, msg, isOk) {
 }
 
 async function transition(newState) {
+    const btns = document.querySelectorAll('.btn-trans');
+    btns.forEach(b => { b.disabled = true; });
     const { ok, data } = await post(`/api/cases/${CASE_ID}/transition/`, { state: newState });
     if (ok) {
         feedback('trans-feedback', `State changed to ${newState}.`, true);
         setTimeout(() => location.reload(), 900);
     } else {
         feedback('trans-feedback', data.error || 'Transition failed.', false);
+        btns.forEach(b => { b.disabled = false; });
     }
 }
 
 async function generateCandidates() {
+    const btn = document.querySelector('[onclick="generateCandidates()"]');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating…';
     feedback('cand-feedback', 'Running reconstruction…', true);
     const { ok, data } = await post(`/api/cases/${CASE_ID}/generate-candidates/`, {});
     if (ok) {
@@ -279,6 +285,8 @@ async function generateCandidates() {
         setTimeout(() => location.reload(), 1200);
     } else {
         feedback('cand-feedback', data.error || 'Generation failed.', false);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Generate / Refresh';
     }
 }
 
@@ -286,6 +294,9 @@ async function uploadArtifact() {
     const raw = document.getElementById('art-raw').value.trim();
     if (!raw) { feedback('art-feedback', 'Paste some raw data first.', false); return; }
     const type = document.getElementById('art-type').value;
+    const btn = document.querySelector('.upload-form .btn-primary');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading…';
     feedback('art-feedback', 'Uploading…', true);
     const { ok, data } = await post(`/api/cases/${CASE_ID}/artifacts/`, {
         artifact_type: type, raw_data: raw,
@@ -295,6 +306,8 @@ async function uploadArtifact() {
         setTimeout(() => location.reload(), 1000);
     } else {
         feedback('art-feedback', data.error || 'Upload failed.', false);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-upload"></i> Upload';
     }
 }
 

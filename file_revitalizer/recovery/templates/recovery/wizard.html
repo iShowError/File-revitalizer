@@ -183,6 +183,7 @@ async function createCase() {
     const btn = document.getElementById('btn-create');
     const err = document.getElementById('err3');
     btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating…';
     err.style.display = 'none';
 
     const body = {
@@ -206,12 +207,14 @@ async function createCase() {
             err.style.display = 'block';
             showToast(data.error || 'Failed to create case.', 'error');
             btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-rocket"></i> Create Case';
         }
     } catch (e) {
         err.textContent = 'Network error \u2014 please try again.';
         err.style.display = 'block';
         showToast('Network error \u2014 please try again.', 'error');
         btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-rocket"></i> Create Case';
     }
 }
 </script>

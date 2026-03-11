@@ -127,7 +127,10 @@
 document.getElementById('new-case-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const errEl = document.getElementById('form-error');
+    const btn = this.querySelector('button[type=submit]');
     errEl.style.display = 'none';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating…';
 
     const body = {
         title:           document.getElementById('inp-title').value.trim(),
@@ -149,11 +152,15 @@ document.getElementById('new-case-form').addEventListener('submit', async functi
             errEl.textContent = data.error || 'Failed to create case.';
             errEl.style.display = 'block';
             showToast(data.error || 'Failed to create case.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-plus"></i> Create';
         }
     } catch (err) {
         errEl.textContent = 'Network error \u2014 please try again.';
         errEl.style.display = 'block';
         showToast('Network error \u2014 please try again.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-plus"></i> Create';
     }
 });
 </script>
