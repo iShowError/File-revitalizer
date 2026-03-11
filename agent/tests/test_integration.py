@@ -3,7 +3,7 @@ import io
 import subprocess
 import sys
 import unittest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 from commands import execute, scan, upload
 

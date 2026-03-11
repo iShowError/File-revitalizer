@@ -3,8 +3,6 @@
 No external DRF dependency — each function converts a model instance to a
 JSON-serialisable dict. Import these in views.py to keep that file clean.
 """
-from django.utils import timezone
-
 
 def serialize_case(case):
     """RecoveryCase → dict."""

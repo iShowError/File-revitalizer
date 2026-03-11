@@ -23,8 +23,6 @@ Confidence scoring:
 """
 import mimetypes
 import os
-from typing import Optional
-
 from .models import Artifact, CandidateFile
 from .parsers.chunk_tree import logical_to_physical
 

@@ -4,17 +4,13 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.contrib import messages
-from django.http import JsonResponse, FileResponse, Http404, HttpResponse
+from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-from django.views import View
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db import transaction
 from django.utils import timezone
 import os
 import json
-import tempfile
 import logging
 
 from dotenv import load_dotenv
@@ -580,7 +576,6 @@ def recovery_result_view(request, case_id, candidate_id):
     """GET /cases/<id>/recover/<candidate_id>/result/
     Renders the recovery result page with generated shell commands.
     """
-    import json as json_mod
     case = get_object_or_404(RecoveryCase, pk=case_id, user=request.user)
     candidate = get_object_or_404(CandidateFile, pk=candidate_id, case=case)
 
@@ -591,7 +586,7 @@ def recovery_result_view(request, case_id, candidate_id):
     )
 
     # Pre-serialise commands list for JS copy-to-clipboard
-    commands_json = json_mod.dumps([s.get('commands', []) for s in strategies])
+    commands_json = json.dumps([s.get('commands', []) for s in strategies])
 
     return render(request, 'recovery/recovery_result.html', {
         'case': case,

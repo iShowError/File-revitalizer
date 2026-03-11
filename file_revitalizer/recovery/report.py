@@ -5,7 +5,7 @@ including timeline, artifacts, candidate outcomes, and chat highlights.
 """
 from django.utils import timezone
 
-from .models import RecoveryCase, AuditEvent
+from .models import RecoveryCase
 
 
 def generate_report(case: RecoveryCase) -> dict:
