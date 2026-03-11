@@ -52,6 +52,23 @@
     .empty-state { text-align: center; padding: 3rem 2rem; }
     .empty-state i { font-size: 2.5rem; color: var(--border); margin-bottom: .75rem; display: block; }
     .empty-state p { color: var(--text-muted); margin-bottom: 1rem; }
+
+    /* ── agent status ── */
+    .agent-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; }
+    .agent-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+    .agent-header h3 { font-size: .95rem; font-weight: 700; display: flex; align-items: center; gap: .5rem; }
+    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+    .status-dot.online  { background: #2ed573; box-shadow: 0 0 8px rgba(46,213,115,.5); }
+    .status-dot.offline { background: var(--text-muted); }
+    .agent-status-text { font-size: .8rem; font-weight: 600; }
+    .agent-status-text.online  { color: #2ed573; }
+    .agent-status-text.offline { color: var(--text-muted); }
+    .agent-list { display: flex; flex-direction: column; gap: .5rem; }
+    .agent-item { display: flex; align-items: center; justify-content: space-between; padding: .5rem .75rem; background: var(--surface2); border-radius: 8px; font-size: .8rem; }
+    .agent-name { font-weight: 600; }
+    .agent-info { color: var(--text-muted); font-size: .75rem; }
+    .agent-heartbeat { font-size: .72rem; color: var(--text-muted); }
+    .agent-none { color: var(--text-muted); font-size: .85rem; }
 </style>
 {% endblock %}
 
@@ -97,6 +114,36 @@
             </div>
             <div class="stat-value" style="color:var(--danger);">{{ failed_cases }}</div>
         </div>
+    </div>
+
+    <!-- Agent Status -->
+    <div class="agent-card">
+        <div class="agent-header">
+            <h3>
+                <i class="fas fa-robot" style="color:var(--accent);"></i> Agent Status
+                <span class="status-dot {% if agent_online %}online{% else %}offline{% endif %}"></span>
+            </h3>
+            <span class="agent-status-text {% if agent_online %}online{% else %}offline{% endif %}">
+                {% if agent_online %}{{ online_agent_count }} Online{% else %}Offline{% endif %}
+            </span>
+        </div>
+        {% if agents %}
+        <div class="agent-list">
+            {% for agent in agents %}
+            <div class="agent-item">
+                <div>
+                    <span class="agent-name">{{ agent.machine_name }}</span>
+                    <span class="agent-info">&nbsp;&mdash; {{ agent.os_info|default:"unknown OS" }} &middot; v{{ agent.agent_version|default:"?" }}</span>
+                </div>
+                <span class="agent-heartbeat">
+                    {% if agent.last_heartbeat %}Last seen {{ agent.last_heartbeat|timesince }} ago{% else %}Never connected{% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="agent-none"><i class="fas fa-info-circle"></i> No agents registered. Install the local agent to start scanning devices.</p>
+        {% endif %}
     </div>
 
     <!-- Recent Cases -->

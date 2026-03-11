@@ -48,12 +48,19 @@ def dashboard(request):
     """Render the dashboard page"""
     cases = RecoveryCase.objects.filter(user=request.user)
 
+    agents = Agent.objects.filter(user=request.user, is_active=True)
+    heartbeat_threshold = timezone.now() - timezone.timedelta(minutes=2)
+    online_agents = [a for a in agents if a.last_heartbeat and a.last_heartbeat >= heartbeat_threshold]
+
     context = {
         'total_cases': cases.count(),
         'active_cases': cases.filter(state__in=['SCANNING', 'RECOVERING', 'ANALYZED']).count(),
         'completed_cases': cases.filter(state='COMPLETE').count(),
         'failed_cases': cases.filter(state='FAILED').count(),
         'recent_cases': cases.order_by('-created_at')[:5],
+        'agents': agents,
+        'agent_online': len(online_agents) > 0,
+        'online_agent_count': len(online_agents),
     }
 
     return render(request, 'dashboard.html', context)
