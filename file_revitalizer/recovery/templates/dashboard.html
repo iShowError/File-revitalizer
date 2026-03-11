@@ -73,6 +73,13 @@
     .agent-info { color: var(--text-muted); font-size: .75rem; }
     .agent-heartbeat { font-size: .72rem; color: var(--text-muted); }
     .agent-none { color: var(--text-muted); font-size: .85rem; }
+
+    @media (max-width: 600px) {
+        .page { padding: 1rem; }
+        .welcome { flex-direction: column; align-items: flex-start; }
+        .btn-new { width: 100%; justify-content: center; }
+        .agent-item { flex-direction: column; align-items: flex-start; gap: .25rem; }
+    }
 </style>
 {% endblock %}
 
@@ -185,8 +192,10 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.querySelectorAll('.stat-card').forEach(card => {
         card.addEventListener('mousemove', (e) => {
+            if (prefersReduced) return;
             const rect = card.getBoundingClientRect();
             const x = e.clientX - rect.left - rect.width / 2;
             const y = e.clientY - rect.top - rect.height / 2;

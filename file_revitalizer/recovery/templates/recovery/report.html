@@ -26,6 +26,7 @@
     table { width: 100%; border-collapse: collapse; font-size: .85rem; }
     th, td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
     th { color: var(--text-muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }
 
     .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .75rem; font-weight: 600; }
     .badge-recovered { background: rgba(0,212,170,.15); color: var(--accent2); }
@@ -39,10 +40,18 @@
 
     @media print {
         body { background: #fff; color: #111; }
-        .main-nav, .actions { display: none; }
+        .main-nav, .breadcrumbs, .actions { display: none; }
         .card { border-color: #ccc; }
         th { color: #555; }
         .page { max-width: 100%; }
+    }
+    @media (max-width: 600px) {
+        .page { padding: 1rem; }
+        .actions { flex-direction: column; }
+        .actions .btn { text-align: center; }
+        .kv { flex-direction: column; gap: .25rem; }
+        .kv .label { min-width: 0; }
+        table { min-width: 500px; }
     }
 </style>
 {% endblock %}
@@ -77,6 +86,7 @@
     <h2>Candidate Files ({{ report.candidates.total }})</h2>
     <div class="card">
         {% if report.candidates.items %}
+        <div class="table-scroll">
         <table>
             <thead>
                 <tr><th>Name</th><th>Size</th><th>Confidence</th><th>Status</th><th>Recovered</th></tr>
@@ -88,11 +98,12 @@
                     <td>{{ c.file_size|filesizeformat }}</td>
                     <td>{{ c.confidence|floatformat:2 }}</td>
                     <td><span class="badge badge-{{ c.status }}">{{ c.status }}</span></td>
-                    <td>{{ c.recovered_at|default:"—" }}</td>
+                    <td>{{ c.recovered_at|default:"\u2014" }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <p style="color:var(--text-muted)">No candidates generated.</p>
         {% endif %}
@@ -101,6 +112,7 @@
     <h2>Artifacts ({{ report.artifacts.count }})</h2>
     <div class="card">
         {% if report.artifacts.items %}
+        <div class="table-scroll">
         <table>
             <thead><tr><th>Type</th><th>Command</th><th>Parsed</th><th>Uploaded</th></tr></thead>
             <tbody>
@@ -114,6 +126,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <p style="color:var(--text-muted)">No artifacts collected.</p>
         {% endif %}
@@ -122,6 +135,7 @@
     <h2>Timeline ({{ report.timeline|length }} events)</h2>
     <div class="card">
         {% if report.timeline %}
+        <div class="table-scroll">
         <table>
             <thead><tr><th>Time</th><th>Event</th><th>Summary</th></tr></thead>
             <tbody>
@@ -134,6 +148,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <p style="color:var(--text-muted)">No audit events recorded.</p>
         {% endif %}

@@ -22,8 +22,8 @@
     .btn-primary:hover { opacity: .85; }
     .error-msg { color: var(--danger); font-size: .8rem; margin-top: .5rem; }
 
-    .cases-table { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-    .cases-table table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+    .cases-table { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .cases-table table { width: 100%; border-collapse: collapse; font-size: .875rem; min-width: 700px; }
     .cases-table th { text-align: left; padding: .75rem 1rem; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); border-bottom: 1px solid var(--border); }
     .cases-table td { padding: .85rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
     .cases-table tr:last-child td { border-bottom: none; }
@@ -50,6 +50,14 @@
     .empty { text-align: center; padding: 4rem 2rem; }
     .empty i { font-size: 3rem; color: var(--border); margin-bottom: 1rem; display: block; }
     .empty p { color: var(--text-muted); margin-bottom: 1.5rem; }
+
+    @media (max-width: 600px) {
+        .page { padding: 1rem; }
+        .form-row { flex-direction: column; }
+        .form-row input { min-width: 0; }
+        .actions { flex-direction: column; }
+        .btn-sm { text-align: center; }
+    }
 </style>
 {% endblock %}
 

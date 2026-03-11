@@ -83,6 +83,18 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .progress-banner .msg { font-size: .85rem; color: #5badf0; font-weight: 600; }
     .progress-banner .detail { color: var(--text-muted); font-size: .78rem; margin-left: auto; white-space: nowrap; }
+
+    @media (max-width: 600px) {
+        .page { padding: 1rem; }
+        .case-header { flex-direction: column; }
+        .actions { width: 100%; }
+        .actions .btn { flex: 1; justify-content: center; }
+        .info-grid { grid-template-columns: 1fr; }
+        .upload-form { flex-direction: column; }
+        .upload-form textarea { min-width: 0; }
+        .progress-banner { flex-wrap: wrap; }
+        .progress-banner .detail { margin-left: 0; }
+    }
 </style>
 {% endblock %}
 
@@ -90,7 +102,7 @@
 <div class="page">
     {% if case.state == 'SCANNING' or case.state == 'RECOVERING' or case.state == 'VERIFYING' %}
     <div class="progress-banner" id="progress-banner">
-        <div class="spinner"></div>
+        <div class="spinner" role="status" aria-label="Processing"></div>
         <span class="msg" id="progress-msg">{{ case.state|title }} in progress…</span>
         <span class="detail" id="progress-detail">Artifacts: {{ artifacts|length }} &middot; Candidates: {{ candidate_count }}</span>
     </div>
