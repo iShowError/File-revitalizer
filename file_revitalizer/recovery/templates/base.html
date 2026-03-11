@@ -64,6 +64,9 @@
             gap: 1rem;
         }
         .main-nav .nav-user { color: var(--text-muted); font-size: .8rem; }
+        .agent-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: .35rem; vertical-align: middle; }
+        .agent-dot.on  { background: #2ed573; box-shadow: 0 0 6px rgba(46,213,115,.5); }
+        .agent-dot.off { background: var(--text-muted); }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -75,7 +78,7 @@
         <a href="{% url 'cases_list' %}">My Cases</a>
         {% block nav_extra %}{% endblock %}
         <span class="nav-right">
-            <span class="nav-user">{{ user.username }}</span>
+            <span class="nav-user">{{ user.username }}<span class="agent-dot {% if nav_agent_online %}on{% else %}off{% endif %}" title="Agent {% if nav_agent_online %}online{% else %}offline{% endif %}"></span></span>
             <a href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i></a>
         </span>
     </nav>
