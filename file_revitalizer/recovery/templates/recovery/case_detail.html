@@ -72,11 +72,25 @@
     .feedback { font-size: .8rem; margin-top: .5rem; display: none; }
     .feedback.ok  { color: var(--accent2); }
     .feedback.err { color: var(--danger); }
+
+    /* ── scan progress banner ── */
+    .progress-banner { display: flex; align-items: center; gap: .75rem; padding: 1rem 1.25rem; background: #1a3555; border: 1px solid #1e4a73; border-radius: 10px; margin-bottom: 1.5rem; }
+    .progress-banner .spinner { width: 20px; height: 20px; border: 3px solid #1e4a73; border-top-color: #5badf0; border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-banner .msg { font-size: .85rem; color: #5badf0; font-weight: 600; }
+    .progress-banner .detail { color: var(--text-muted); font-size: .78rem; margin-left: auto; white-space: nowrap; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page">
+    {% if case.state == 'SCANNING' or case.state == 'RECOVERING' or case.state == 'VERIFYING' %}
+    <div class="progress-banner" id="progress-banner">
+        <div class="spinner"></div>
+        <span class="msg" id="progress-msg">{{ case.state|title }} in progress…</span>
+        <span class="detail" id="progress-detail">Artifacts: {{ artifacts|length }} &middot; Candidates: {{ candidate_count }}</span>
+    </div>
+    {% endif %}
     <div class="case-header">
         <div>
             <h1>{{ case.title }}</h1>
@@ -266,5 +280,38 @@ async function uploadArtifact() {
         feedback('art-feedback', data.error || 'Upload failed.', false);
     }
 }
+
+// ── Real-time progress polling ──
+(function() {
+    const ACTIVE = ['SCANNING', 'RECOVERING', 'VERIFYING'];
+    const initial = '{{ case.state }}';
+    if (ACTIVE.indexOf(initial) === -1) return;
+
+    const banner  = document.getElementById('progress-banner');
+    const msgEl   = document.getElementById('progress-msg');
+    const detEl   = document.getElementById('progress-detail');
+    let polling   = true;
+
+    async function poll() {
+        if (!polling) return;
+        try {
+            const r = await fetch(`/api/cases/${CASE_ID}/`);
+            if (!r.ok) return;
+            const d = await r.json();
+            const c = d.case;
+
+            if (ACTIVE.indexOf(c.state) === -1) {
+                // State changed out of active — reload page
+                location.reload();
+                return;
+            }
+            if (msgEl)  msgEl.textContent  = c.state.charAt(0) + c.state.slice(1).toLowerCase() + ' in progress\u2026';
+            if (detEl)  detEl.textContent  = 'Artifacts: ' + d.artifact_count + ' \u00b7 Candidates: ' + d.candidate_count;
+        } catch (e) { /* ignore network hiccups */ }
+        setTimeout(poll, 4000);
+    }
+
+    setTimeout(poll, 4000);
+})();
 </script>
 {% endblock %}
